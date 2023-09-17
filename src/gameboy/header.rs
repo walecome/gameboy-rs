@@ -160,7 +160,7 @@ impl RomSize {
 
 #[derive(Debug)]
 enum RamSize {
-    NoRam,
+    NoBanks,
     Size {
         bank_count: usize,
         bank_size_kb: usize,
@@ -170,7 +170,7 @@ enum RamSize {
 impl RamSize {
     fn from_byte(byte: u8) -> Option<RamSize> {
         match byte {
-            0x00 => Some(RamSize::NoRam),
+            0x00 => Some(RamSize::NoBanks),
             0x01 => Some(RamSize::Size { bank_count: 1, bank_size_kb: 2 }),
             0x02 => Some(RamSize::Size { bank_count: 1, bank_size_kb: 8 }),
             0x03 => Some(RamSize::Size { bank_count: 4, bank_size_kb: 8 }),
