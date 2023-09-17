@@ -80,7 +80,7 @@ struct CPU<'a> {
     l: u8,
 }
 
-enum Target {
+enum TargetU8 {
     Register(RegisterU8),
     AddressHL,
 }
@@ -88,40 +88,75 @@ enum Target {
 enum Instruction {
     Noop,
     Halt,
-    Load { dst: Target, src: Target },
+    Load { dst: TargetU8, src: TargetU8 },
+    JumpImmediate,
 }
 
-fn decode_load_source(mask: u8) -> Target {
+fn decode_load_source(mask: u8) -> TargetU8 {
     match mask {
-        0x0 | 0x8 => Target::Register(RegisterU8::B),
-        0x1 | 0x9 => Target::Register(RegisterU8::C),
-        0x2 | 0xA => Target::Register(RegisterU8::D),
-        0x3 | 0xB => Target::Register(RegisterU8::E),
-        0x4 | 0xC => Target::Register(RegisterU8::H),
-        0x5 | 0xD => Target::Register(RegisterU8::L),
-        0x7 | 0xF => Target::Register(RegisterU8::A),
-        0x6 | 0xE => Target::AddressHL,
+        0x0 | 0x8 => TargetU8::Register(RegisterU8::B),
+        0x1 | 0x9 => TargetU8::Register(RegisterU8::C),
+        0x2 | 0xA => TargetU8::Register(RegisterU8::D),
+        0x3 | 0xB => TargetU8::Register(RegisterU8::E),
+        0x4 | 0xC => TargetU8::Register(RegisterU8::H),
+        0x5 | 0xD => TargetU8::Register(RegisterU8::L),
+        0x7 | 0xF => TargetU8::Register(RegisterU8::A),
+        0x6 | 0xE => TargetU8::AddressHL,
         _ => panic!("Unknown LD destination mask: {}", mask),
     }
 }
 
-fn decode_load_destination(row_mask: u8, col_mask: u8) -> Target {
+fn decode_load_destination(row_mask: u8, col_mask: u8) -> TargetU8 {
     if col_mask <= 0x7 {
         match row_mask {
-            0x4 => Target::Register(RegisterU8::B),
-            0x5 => Target::Register(RegisterU8::D),
-            0x6 => Target::Register(RegisterU8::H),
-            0x7 => Target::AddressHL,
+            0x4 => TargetU8::Register(RegisterU8::B),
+            0x5 => TargetU8::Register(RegisterU8::D),
+            0x6 => TargetU8::Register(RegisterU8::H),
+            0x7 => TargetU8::AddressHL,
             _ => panic!("Unknown LD src mask: ({}, {}", row_mask, col_mask),
         }
     } else {
         match row_mask {
-            0x4 => Target::Register(RegisterU8::C),
-            0x5 => Target::Register(RegisterU8::E),
-            0x6 => Target::Register(RegisterU8::L),
-            0x7 => Target::Register(RegisterU8::A),
+            0x4 => TargetU8::Register(RegisterU8::C),
+            0x5 => TargetU8::Register(RegisterU8::E),
+            0x6 => TargetU8::Register(RegisterU8::L),
+            0x7 => TargetU8::Register(RegisterU8::A),
             _ => panic!("Unknown LD src mask: ({}, {}", row_mask, col_mask),
         }
+    }
+}
+
+fn is_u8_load_instruction(opcode: u8) -> bool {
+    let row_mask = (opcode & 0xF0) >> 4;
+    let col_mask = opcode & 0x0F;
+
+    match col_mask {
+        0x2 | 0x6 | 0xA | 0xE => {
+            if (0x0..=0x3).contains(&row_mask) {
+                return true;
+            }
+        }
+        _ => (),
+    }
+
+    match col_mask {
+        0x1 | 0x2 | 0xA => {
+            if (0xE..=0xF).contains(&row_mask) {
+                return true;
+            }
+        }
+        _ => (),
+    }
+
+    match row_mask {
+        0x4 | 0x5 | 0x6 | 0x7 => {
+            // HALT
+            if opcode == 0x76 {
+                return false;
+            }
+            return true;
+        }
+        _ => false,
     }
 }
 
@@ -130,16 +165,16 @@ fn decode(opcode: u8) -> Option<Instruction> {
     let row_mask = (opcode & 0xF0) >> 4;
     let col_mask = opcode & 0x0F;
 
-    match (opcode, row_mask, col_mask) {
-        (0x00, _, _) => Some(Instruction::Noop),
-        (_, 0x4, _) | (_, 0x5, _) | (_, 0x6, _) | (_, 0x7, _) => {
-            if opcode == 0x76 {
-                return Some(Instruction::Halt);
-            }
-            let src = decode_load_source(col_mask);
-            let dst = decode_load_destination(row_mask, col_mask);
-            Some(Instruction::Load { src, dst })
-        }
+    if is_u8_load_instruction(opcode) {
+        let src = decode_load_source(col_mask);
+        let dst = decode_load_destination(row_mask, col_mask);
+        return Some(Instruction::Load { src, dst });
+    }
+
+    match opcode {
+        0x00 => Some(Instruction::Noop),
+        0x76 => Some(Instruction::Halt),
+        0xC3 => Some(Instruction::JumpImmediate),
         _ => None,
     }
 }
@@ -161,25 +196,15 @@ impl CPU<'_> {
         match instruction {
             Instruction::Noop => {}
             Instruction::Load { dst, src } => {
-                let value: u8 = match src {
-                    Target::Register(reg) => self.resolve_u8_reg(reg).clone(),
-                    Target::AddressHL => {
-                        let value = self.resolve_u16_reg(RegisterU16::HL).get();
-                        self.memory.get(value)
-                    }
-                };
-                match dst {
-                    Target::Register(reg) => {
-                        *self.resolve_u8_reg(reg) = value;
-                    }
-                    Target::AddressHL => {
-                        let address = self.resolve_u16_reg(RegisterU16::HL).get();
-                        self.memory.set(address, value);
-                    }
-                }
+                let value = self.read_u8_target(src);
+                self.write_u8_target(dst, value);
             }
 
             Instruction::Halt => panic!("Should be caught above"),
+            Instruction::JumpImmediate => {
+                let address = self.read_u16();
+                self.pc = address;
+            }
         }
 
         return true;
@@ -222,6 +247,28 @@ impl CPU<'_> {
             RegisterU16::HL => (&mut self.h, &mut self.l),
         };
         RegisterPair { high, low }
+    }
+
+    fn read_u8_target(&mut self, target: TargetU8) -> u8 {
+        match target {
+            TargetU8::Register(reg) => self.resolve_u8_reg(reg).clone(),
+            TargetU8::AddressHL => {
+                let value = self.resolve_u16_reg(RegisterU16::HL).get();
+                self.memory.get(value)
+            }
+        }
+    }
+
+    fn write_u8_target(&mut self, target: TargetU8, value: u8) {
+        match target {
+            TargetU8::Register(reg) => {
+                *self.resolve_u8_reg(reg) = value;
+            }
+            TargetU8::AddressHL => {
+                let address = self.resolve_u16_reg(RegisterU16::HL).get();
+                self.memory.set(address, value);
+            }
+        }
     }
 }
 
