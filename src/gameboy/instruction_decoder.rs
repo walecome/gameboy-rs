@@ -26,6 +26,7 @@ pub enum Instruction {
     Halt,
     Load { dst: TargetU8, src: TargetU8 },
     JumpImmediate,
+    DisableInterrupts,
 }
 
 fn decode_load_source(mask: u8) -> TargetU8 {
@@ -111,6 +112,7 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
         0x00 => Some(Instruction::Noop),
         0x76 => Some(Instruction::Halt),
         0xC3 => Some(Instruction::JumpImmediate),
+        0xF3 => Some(Instruction::DisableInterrupts),
         _ => None,
     }
 }

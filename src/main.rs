@@ -61,6 +61,7 @@ struct CPU<'a> {
     f: u8,
     h: u8,
     l: u8,
+    interrupts_enabled: bool,
 }
 
 impl CPU<'_> {
@@ -89,6 +90,7 @@ impl CPU<'_> {
                 let address = self.read_u16();
                 self.pc = address;
             }
+            Instruction::DisableInterrupts => self.interrupts_enabled = false,
         }
 
         return true;
@@ -177,6 +179,7 @@ fn main() {
         f: 0x00,
         h: 0x00,
         l: 0x00,
+        interrupts_enabled: false,
     };
     loop {
         cpu.tick();
