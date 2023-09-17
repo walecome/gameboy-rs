@@ -26,39 +26,6 @@ impl Memory {
     }
 }
 
-struct Register {
-    high: u8,
-    low: u8,
-}
-
-impl Register {
-    fn new() -> Register {
-        Register { high: 0, low: 0 }
-    }
-
-    fn value(&self) -> u16 {
-        ((self.high as u16) << 8) | (self.low as u16)
-    }
-}
-
-struct Registers {
-    af: Register,
-    bc: Register,
-    de: Register,
-    hl: Register,
-}
-
-impl Registers {
-    fn new() -> Registers {
-        Registers {
-            af: Register::new(),
-            bc: Register::new(),
-            de: Register::new(),
-            hl: Register::new(),
-        }
-    }
-}
-
 enum RegisterU8 {
     A,
     B,
@@ -77,14 +44,41 @@ enum RegisterU16 {
     HL,
 }
 
+struct RegisterPair<'a> {
+    high: &'a mut u8,
+    low: &'a mut u8,
+}
+
+impl RegisterPair<'_> {
+    fn get(&self) -> u16 {
+        let high = self.high.clone() as u16;
+        let low = self.low.clone() as u16;
+        return high << 8 | low;
+    }
+
+    fn set(&mut self, value: u16) {
+        let high = (value & 0xF0) >> 8;
+        let low = value & 0x0F;
+
+        *self.high = high as u8;
+        *self.low = low as u8;
+    }
+}
+
 struct CPU<'a> {
     rom_data: &'a Vec<u8>,
     pc: u16,
     sp: u16,
     memory: Memory,
-    registers: Registers,
+    a: u8,
+    b: u8,
+    c: u8,
+    d: u8,
+    e: u8,
+    f: u8,
+    h: u8,
+    l: u8,
 }
-
 
 enum Target {
     Register(RegisterU8),
@@ -94,10 +88,7 @@ enum Target {
 enum Instruction {
     Noop,
     Halt,
-    Load {
-        dst: Target,
-        src: Target,
-    }
+    Load { dst: Target, src: Target },
 }
 
 fn decode_load_source(mask: u8) -> Target {
@@ -157,7 +148,8 @@ impl CPU<'_> {
     fn tick(&mut self) -> bool {
         let opcode = self.read_u8();
         println!("opcode: {:#04X}", opcode);
-        let instruction = decode(opcode).expect(format!("Unknown opcode: {:#04X}", opcode).as_str());
+        let instruction =
+            decode(opcode).expect(format!("Unknown opcode: {:#04X}", opcode).as_str());
         let should_halt = match instruction {
             Instruction::Halt => true,
             _ => false,
@@ -167,25 +159,28 @@ impl CPU<'_> {
         }
 
         match instruction {
-            Instruction::Noop => {},
+            Instruction::Noop => {}
             Instruction::Load { dst, src } => {
                 let value: u8 = match src {
                     Target::Register(reg) => self.resolve_u8_reg(reg).clone(),
-                    Target::AddressHL => self.memory.get(self.registers.hl.value()),
+                    Target::AddressHL => {
+                        let value = self.resolve_u16_reg(RegisterU16::HL).get();
+                        self.memory.get(value)
+                    }
                 };
                 match dst {
                     Target::Register(reg) => {
                         *self.resolve_u8_reg(reg) = value;
-                    },
+                    }
                     Target::AddressHL => {
-                        self.memory.set(self.registers.hl.value(), value);
-                    },
+                        let address = self.resolve_u16_reg(RegisterU16::HL).get();
+                        self.memory.set(address, value);
+                    }
                 }
-            },
+            }
 
             Instruction::Halt => panic!("Should be caught above"),
         }
-
 
         return true;
     }
@@ -208,15 +203,25 @@ impl CPU<'_> {
 
     fn resolve_u8_reg(&mut self, reg: RegisterU8) -> &mut u8 {
         match reg {
-            RegisterU8::A => &mut self.registers.af.high,
-            RegisterU8::B => todo!(),
-            RegisterU8::C => todo!(),
-            RegisterU8::D => todo!(),
-            RegisterU8::E => todo!(),
-            RegisterU8::F => todo!(),
-            RegisterU8::H => todo!(),
-            RegisterU8::L => todo!(),
+            RegisterU8::A => &mut self.a,
+            RegisterU8::B => &mut self.b,
+            RegisterU8::C => &mut self.c,
+            RegisterU8::D => &mut self.d,
+            RegisterU8::E => &mut self.e,
+            RegisterU8::F => &mut self.f,
+            RegisterU8::H => &mut self.h,
+            RegisterU8::L => &mut self.l,
         }
+    }
+
+    fn resolve_u16_reg(&mut self, reg: RegisterU16) -> RegisterPair {
+        let (high, low) = match reg {
+            RegisterU16::AF => (&mut self.a, &mut self.f),
+            RegisterU16::BC => (&mut self.b, &mut self.c),
+            RegisterU16::DE => (&mut self.d, &mut self.e),
+            RegisterU16::HL => (&mut self.h, &mut self.l),
+        };
+        RegisterPair { high, low }
     }
 }
 
@@ -230,10 +235,17 @@ fn main() {
         rom_data: &rom_data,
         pc: 0x0100,
         sp: 0x0000,
-        registers: Registers::new(),
         memory: Memory {
             data: vec![0x00; 0xFFFF],
         },
+        a: 0x00,
+        b: 0x00,
+        c: 0x00,
+        d: 0x00,
+        e: 0x00,
+        f: 0x00,
+        h: 0x00,
+        l: 0x00,
     };
     loop {
         cpu.tick();
