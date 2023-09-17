@@ -45,49 +45,33 @@ pub enum Instruction {
 }
 
 fn decode_u8_load_src(opcode: u8, row_mask: u8, col_mask: u8) -> TargetU8 {
-    if (0x4..=0x7).contains(&row_mask) {
-        return match col_mask {
-            0x0 | 0x8 => TargetU8::Register(RegisterU8::B),
-            0x1 | 0x9 => TargetU8::Register(RegisterU8::C),
-            0x2 | 0xA => TargetU8::Register(RegisterU8::D),
-            0x3 | 0xB => TargetU8::Register(RegisterU8::E),
-            0x4 | 0xC => TargetU8::Register(RegisterU8::H),
-            0x5 | 0xD => TargetU8::Register(RegisterU8::L),
-            0x7 | 0xF => TargetU8::Register(RegisterU8::A),
-            0x6 | 0xE => TargetU8::AddressU16(RegisterU16::HL),
-            _ => panic!("Unknown LD destination mask: {}", col_mask),
-        };
-    }
-    if opcode == 0x0E {
-        return TargetU8::Register(RegisterU8::A);
-    }
-    if opcode == 0x0F {
-        return TargetU8::ImmediateAddressU8;
-    }
+    match (row_mask, col_mask) {
+        (0x4..=0x7, 0x0 | 0x8) => TargetU8::Register(RegisterU8::B),
+        (0x4..=0x7, 0x1 | 0x9) => TargetU8::Register(RegisterU8::C),
+        (0x4..=0x7, 0x2 | 0xA) => TargetU8::Register(RegisterU8::D),
+        (0x4..=0x7, 0x3 | 0xB) => TargetU8::Register(RegisterU8::E),
+        (0x4..=0x7, 0x4 | 0xC) => TargetU8::Register(RegisterU8::H),
+        (0x4..=0x7, 0x5 | 0xD) => TargetU8::Register(RegisterU8::L),
+        (0x4..=0x7, 0x6 | 0xE) => TargetU8::AddressU16(RegisterU16::HL),
+        (0x4..=0x7, 0x7 | 0xF) => TargetU8::Register(RegisterU8::A),
 
-    if col_mask == 0x2 {
-        return match row_mask {
-            0x0..=0x3 | 0xE => TargetU8::Register(RegisterU8::A),
-            0xF => TargetU8::AddressU8(RegisterU8::C),
-        }
-    }
+        (0x0, 0xE) => TargetU8::Register(RegisterU8::A),
+        (0x0, 0xF) => TargetU8::ImmediateAddressU8,
 
-    if col_mask == 0x6 {
-        return TargetU8::ImmediateValue;
-    }
+        (0x0..=0x3 | 0xE, 0x2) => TargetU8::Register(RegisterU8::A),
+        (0xF, 0x2) => TargetU8::AddressU8(RegisterU8::C),
 
-    if col_mask == 0xA {
-        return match row_mask {
-            0x0 => TargetU8::AddressU16(RegisterU16::BC),
-            0x1 => TargetU8::AddressU16(RegisterU16::DE),
-            0x2 => TargetU8::AddressU16Increment(RegisterU16::HL),
-            0x3 => TargetU8::AddressU16Decrement(RegisterU16::HL),
-            0xE => TargetU8::Register(RegisterU8::A),
-            0xF => TargetU8::ImmediateAddressU16,
-        }
-    }
+        (0x0..=0x3, 0x6) => TargetU8::ImmediateValue,
 
-    panic!("Unknown src for LD opcode: {}", opcode);
+        (0x0, 0xA) => TargetU8::AddressU16(RegisterU16::BC),
+        (0x1, 0xA) => TargetU8::AddressU16(RegisterU16::DE),
+        (0x2, 0xA) => TargetU8::AddressU16Increment(RegisterU16::HL),
+        (0x3, 0xA) => TargetU8::AddressU16Decrement(RegisterU16::HL),
+        (0xE, 0xA) => TargetU8::Register(RegisterU8::A),
+        (0xF, 0xA) => TargetU8::ImmediateAddressU16,
+
+        _ => panic!("Unknown src for LD opcode: {}, {}", row_mask, col_mask),
+    }
 }
 
 fn decode_u8_load_dst(row_mask: u8, col_mask: u8) -> TargetU8 {
