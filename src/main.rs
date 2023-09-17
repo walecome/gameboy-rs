@@ -5,7 +5,7 @@ use std::{fs, path::PathBuf};
 use clap::Parser;
 
 use gameboy::header::Header;
-use gameboy::instruction_decoder::{Instruction, decode, TargetU8, RegisterU16, RegisterU8};
+use gameboy::instruction_decoder::{Instruction, decode, TargetU8, TargetU16, RegisterU16, RegisterU8};
 
 #[derive(Parser)]
 struct Args {
@@ -24,6 +24,17 @@ impl Memory {
 
     fn get(&self, address: u16) -> u8 {
         self.data[address as usize]
+    }
+
+    fn set_u16(&mut self, address: u16, value: u16) {
+        self.data[address as usize] = ((value & 0xFF00) >> 8) as u8;
+        self.data[(address + 1) as usize] = (value & 0x00FF) as u8;
+    }
+
+    fn get_u16(&self, address: u16) -> u16 {
+        let low = self.data[address as usize];
+        let high = self.data[(address + 1) as usize];
+        return ((high as u16) << 8) & (low as u16);
     }
 }
 
@@ -80,7 +91,7 @@ impl CPU<'_> {
 
         match instruction {
             Instruction::Noop => {}
-            Instruction::Load { dst, src } => {
+            Instruction::LoadU8 { dst, src } => {
                 let value = self.read_u8_target(src);
                 self.write_u8_target(dst, value);
             }
@@ -91,6 +102,10 @@ impl CPU<'_> {
                 self.pc = address;
             }
             Instruction::DisableInterrupts => self.interrupts_enabled = false,
+            Instruction::LoadU16 { dst, src } => {
+                let value = self.read_u16_target(src);
+                self.write_u16_target(dst, value);
+            }
         }
 
         return true;
@@ -154,6 +169,36 @@ impl CPU<'_> {
                 let address = self.resolve_u16_reg(RegisterU16::HL).get();
                 self.memory.set(address, value);
             }
+        }
+    }
+
+    fn read_u16_target(&mut self, target: TargetU16) -> u16 {
+        match target {
+            TargetU16::Register(reg) => self.resolve_u16_reg(reg).get(),
+            TargetU16::ImmediateU16 => self.read_u16(),
+            TargetU16::StackPointer => self.sp,
+            TargetU16::Address => {
+                let address = self.read_u16();
+                self.memory.get_u16(address)
+            }
+            TargetU16::StackPointerWithOffset => {
+                let offset = self.read_u8();
+                let value = (self.sp as i32) + (offset as i32);
+                value as u16
+            }
+        }
+    }
+
+    fn write_u16_target(&mut self, target: TargetU16, value: u16) {
+        match target {
+            TargetU16::Register(reg) => self.resolve_u16_reg(reg).set(value),
+            TargetU16::ImmediateU16 => panic!("Cannot write immedate u16"),
+            TargetU16::StackPointer => self.sp = value,
+            TargetU16::Address => {
+                let address = self.read_u16();
+                self.memory.set_u16(address, value);
+            },
+            TargetU16::StackPointerWithOffset => panic!("Cannot write SP with offset"),
         }
     }
 }
