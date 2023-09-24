@@ -28,6 +28,7 @@ struct Memory {
 
 impl Memory {
     fn set(&mut self, address: u16, value: u8) {
+        // TODO: Handle memory map
         self.data[address as usize] = value;
     }
 
@@ -280,7 +281,7 @@ fn main() {
         pc: 0x0100,
         sp: 0x0000,
         memory: Memory {
-            data: vec![0x00; 0xFFFF],
+            data: vec![0x00; 0xFFFF + 1],
         },
         a: 0x00,
         b: 0x00,
