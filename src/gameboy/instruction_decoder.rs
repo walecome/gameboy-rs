@@ -56,6 +56,13 @@ pub enum LoadDstU16 {
     ImmediateAddress,
 }
 
+pub enum CallCondition {
+    NZ,
+    NC,
+    Z,
+    C,
+}
+
 pub enum Instruction {
     Noop,
     Halt,
@@ -63,6 +70,7 @@ pub enum Instruction {
     LoadU16 { dst: LoadDstU16, src: LoadSrcU16 },
     JumpImmediate,
     DisableInterrupts,
+    Call(Option<CallCondition>),
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
@@ -186,6 +194,18 @@ fn try_decode_u16_load_instruction(opcode: u8) -> Option<Instruction> {
     }
 }
 
+fn try_decode_call_instruction(opcode: u8) -> Option<Instruction> {
+    Some(match opcode {
+        0xC4 => Instruction::Call(Some(CallCondition::NZ)),
+        0xCC => Instruction::Call(Some(CallCondition::Z)),
+        0xCD => Instruction::Call(None),
+
+        0xD4 => Instruction::Call(Some(CallCondition::NC)),
+        0xDC => Instruction::Call(Some(CallCondition::C)),
+        _ => return None,
+    })
+}
+
 // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 pub fn decode(opcode: u8) -> Option<Instruction> {
     if let Some(instruction) = try_decode_u8_load_instruction(opcode) {
@@ -193,6 +213,10 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
     }
 
     if let Some(instruction) = try_decode_u16_load_instruction(opcode) {
+        return Some(instruction);
+    }
+
+    if let Some(instruction) = try_decode_call_instruction(opcode) {
         return Some(instruction);
     }
 

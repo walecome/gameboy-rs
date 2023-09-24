@@ -121,6 +121,13 @@ impl CPU<'_> {
                 let value = self.read_u16_target(src);
                 self.write_u16_target(dst, value);
             }
+            Instruction::Call(condition) => {
+                if condition.is_some() {
+                    todo!("Implement call condition")
+                } else {
+                    self.call();
+                }
+            }
         }
 
         return true;
@@ -269,6 +276,17 @@ impl CPU<'_> {
             },
         }
     }
+
+    fn call(&mut self) {
+        let target_address = self.read_u16();
+        self.stack_push(self.pc);
+        self.pc = target_address;
+    }
+
+    fn stack_push(&mut self, value: u16) {
+        self.sp -= 2;
+        self.memory.set_u16(self.sp, value);
+    }
 }
 
 fn main() {
@@ -280,7 +298,7 @@ fn main() {
     let mut cpu = CPU {
         rom_data: &rom_data,
         pc: 0x0100,
-        sp: 0x0000,
+        sp: 0x0FFFE,
         memory: Memory {
             data: vec![0x00; 0xFFFF + 1],
         },
