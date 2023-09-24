@@ -78,8 +78,8 @@ impl RegisterPair<'_> {
     }
 
     fn set(&mut self, value: u16) {
-        let high = (value & 0xF0) >> 8;
-        let low = value & 0x0F;
+        let high = (value & 0xFF00) >> 8;
+        let low = value & 0x00FF;
 
         *self.high = high as u8;
         *self.low = low as u8;
@@ -106,9 +106,9 @@ impl CPU<'_> {
     fn tick(&mut self) -> bool {
         let pc = self.pc;
         let opcode = self.read_u8();
-        println!("{:#06X}: {:#04X}", pc, opcode);
         let instruction =
-            decode(opcode).expect(format!("Unknown opcode: {:#04X}", opcode).as_str());
+            decode(opcode).expect(format!("Unknown opcode: {:#06X}: {:#04X}", pc, opcode).as_str());
+        println!("{:#06X}: {:#04X} ({:?})", pc, opcode, instruction);
 
         match instruction {
             Instruction::Noop => {}
