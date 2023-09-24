@@ -70,6 +70,13 @@ pub enum JumpCondition {
     C,
 }
 
+pub enum RetCondition {
+    NZ,
+    NC,
+    Z,
+    C,
+}
+
 pub enum Instruction {
     Noop,
     Halt,
@@ -78,7 +85,8 @@ pub enum Instruction {
     JumpImmediate,
     DisableInterrupts,
     Call(Option<CallCondition>),
-    JumpRelative(Option<JumpCondition>)
+    JumpRelative(Option<JumpCondition>),
+    Ret(Option<RetCondition>),
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
@@ -227,6 +235,20 @@ fn try_decode_relative_jump_instruction(opcode: u8) -> Option<Instruction> {
     })
 }
 
+fn try_decode_ret_instruction(opcode: u8) -> Option<Instruction> {
+    Some(match opcode {
+        0xC0 => Instruction::Ret(Some(RetCondition::NZ)),
+        0xC8 => Instruction::Ret(Some(RetCondition::Z)),
+        0xC9 => Instruction::Ret(None),
+
+        0xD0 => Instruction::Ret(Some(RetCondition::NC)),
+        0xD8 => Instruction::Ret(Some(RetCondition::C)),
+
+        0xD9 => todo!("RETI"),
+        _ => return None,
+    })
+}
+
 // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 pub fn decode(opcode: u8) -> Option<Instruction> {
     if let Some(instruction) = try_decode_u8_load_instruction(opcode) {
@@ -242,6 +264,10 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
     }
 
     if let Some(instruction) = try_decode_relative_jump_instruction(opcode) {
+        return Some(instruction);
+    }
+
+    if let Some(instruction) = try_decode_ret_instruction(opcode) {
         return Some(instruction);
     }
 
