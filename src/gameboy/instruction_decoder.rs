@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum RegisterU8 {
     A,
     B,
@@ -9,6 +10,7 @@ pub enum RegisterU8 {
     L,
 }
 
+#[derive(Debug)]
 pub enum RegisterU16 {
     AF,
     BC,
@@ -16,6 +18,7 @@ pub enum RegisterU16 {
     HL,
 }
 
+#[derive(Debug)]
 pub enum LoadSrcU8 {
     Register(RegisterU8),
     AddressU16(RegisterU16),
@@ -27,6 +30,7 @@ pub enum LoadSrcU8 {
     AddressU16Decrement(RegisterU16),
 }
 
+#[derive(Debug)]
 pub enum LoadDstU8 {
     Register(RegisterU8),
     AddressU8(RegisterU8),
@@ -37,6 +41,7 @@ pub enum LoadDstU8 {
     ImmediateAddressU16,
 }
 
+#[derive(Debug)]
 pub enum LoadSrcU16 {
     Register(RegisterU16),
     ImmediateU16,
@@ -44,6 +49,7 @@ pub enum LoadSrcU16 {
     StackPointerWithOffset,
 }
 
+#[derive(Debug)]
 pub enum LoadDstU16 {
     Register(RegisterU16),
     StackPointer,
