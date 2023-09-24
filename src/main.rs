@@ -6,8 +6,8 @@ use clap::Parser;
 
 use gameboy::header::Header;
 use gameboy::instruction_decoder::{
-    decode, IncTarget, Instruction, LoadDstU16, LoadDstU8, LoadSrcU16, LoadSrcU8, RegisterU16,
-    RegisterU8, LogicalOpTarget,
+    decode, Instruction, LoadDstU16, LoadDstU8, LoadSrcU16, LoadSrcU8, RegisterU16,
+    RegisterU8, LogicalOpTarget, FlagCondition, IncU8Target, IncU16Target,
 };
 
 #[derive(Parser)]
@@ -141,24 +141,18 @@ impl CPU<'_> {
                 self.write_u16_target(dst, value);
             }
             Instruction::Call(condition) => {
-                if condition.is_some() {
-                    todo!("Implement call condition")
-                } else {
+                if self.is_flag_condition_true(condition) {
                     self.call();
                 }
             }
             Instruction::JumpRelative(condition) => {
-                if condition.is_some() {
-                    todo!("Implement call condition")
-                } else {
+                if self.is_flag_condition_true(condition) {
                     let offset = self.read_u8();
                     self.relative_jump(offset);
                 }
             }
             Instruction::Ret(condition) => {
-                if condition.is_some() {
-                    todo!("Implement call condition")
-                } else {
+                if self.is_flag_condition_true(condition) {
                     self.ret()
                 }
             }
@@ -166,12 +160,11 @@ impl CPU<'_> {
                 self.push(reg);
             }
             Instruction::Pop(reg) => self.pop(reg),
-            Instruction::Inc(target) => {
-                self.inc(target);
-            }
             Instruction::Or(target) => {
                 self.or(target);
             },
+            Instruction::IncU8(target) => self.inc_u8(target),
+            Instruction::IncU16(target) => self.inc_u16(target),
         }
 
         return true;
@@ -349,25 +342,36 @@ impl CPU<'_> {
         self.resolve_u16_reg(&reg).set(value);
     }
 
-    fn inc(&mut self, target: IncTarget) {
+    fn inc_u8(&mut self, target: IncU8Target) {
+        let result = match target {
+            IncU8Target::RegisterU8(reg) => {
+                let current = self.resolve_u8_reg(reg);
+                *current = *current + 1;
+                *current
+            }
+            IncU8Target::Address(reg) => {
+                let address = self.resolve_u16_reg(&reg).get();
+                let value = self.memory.get(address) + 1;
+                self.memory.set(address, value);
+                value
+            }
+        };
+
+        self.flags.z = result == 0;
+        self.flags.n = false;
+        self.flags.h = (result & 0x0F) == 0x00;
+    }
+
+    fn inc_u16(&mut self, target: IncU16Target) {
         match target {
-            IncTarget::RegisterU16(reg) => {
+            IncU16Target::RegisterU16(reg) => {
                 let current = self.resolve_u16_reg(&reg).get();
                 self.resolve_u16_reg(&reg).set(current + 1);
             }
-            IncTarget::RegisterU8(reg) => {
-                let current = self.resolve_u8_reg(reg);
-                *current = *current + 1;
-            }
-            IncTarget::Address(reg) => {
-                let address = self.resolve_u16_reg(&reg).get();
-                let value = self.memory.get(address);
-                self.memory.set(address, value + 1);
-            }
-            IncTarget::StackPointer => {
+            IncU16Target::StackPointer => {
                 self.sp += 1;
             }
-        }
+        };
     }
 
     fn or(&mut self, target: LogicalOpTarget) {
@@ -379,11 +383,26 @@ impl CPU<'_> {
             }
             LogicalOpTarget::ImmediateU8 => self.read_u8(),
         };
+
         self.a = self.a | value;
+
         self.flags.z = self.a == 0;
         self.flags.h = false;
         self.flags.c = false;
         self.flags.n = false;
+    }
+
+    fn is_flag_condition_true(&self, condition: Option<FlagCondition>) -> bool {
+        // No condition is always true
+        if condition.is_none() {
+            return true;
+        }
+        match condition.unwrap() {
+            FlagCondition::Z => self.flags.z,
+            FlagCondition::NZ => !self.flags.z,
+            FlagCondition::C => self.flags.c,
+            FlagCondition::NC => !self.flags.c,
+        }
     }
 
 }

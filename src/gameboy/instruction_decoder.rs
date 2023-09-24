@@ -57,7 +57,7 @@ pub enum LoadDstU16 {
 }
 
 #[derive(Debug)]
-pub enum Condition {
+pub enum FlagCondition {
     NZ,
     NC,
     Z,
@@ -65,10 +65,14 @@ pub enum Condition {
 }
 
 #[derive(Debug)]
-pub enum IncTarget {
-    RegisterU16(RegisterU16),
+pub enum IncU8Target {
     RegisterU8(RegisterU8),
     Address(RegisterU16),
+}
+
+#[derive(Debug)]
+pub enum IncU16Target {
+    RegisterU16(RegisterU16),
     StackPointer,
 }
 
@@ -87,12 +91,13 @@ pub enum Instruction {
     LoadU16 { dst: LoadDstU16, src: LoadSrcU16 },
     JumpImmediate,
     DisableInterrupts,
-    Call(Option<Condition>),
-    JumpRelative(Option<Condition>),
-    Ret(Option<Condition>),
+    Call(Option<FlagCondition>),
+    JumpRelative(Option<FlagCondition>),
+    Ret(Option<FlagCondition>),
     Push(RegisterU16),
     Pop(RegisterU16),
-    Inc(IncTarget),
+    IncU8(IncU8Target),
+    IncU16(IncU16Target),
     Or(LogicalOpTarget),
 }
 
@@ -219,12 +224,12 @@ fn try_decode_u16_load_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_call_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0xC4 => Instruction::Call(Some(Condition::NZ)),
-        0xCC => Instruction::Call(Some(Condition::Z)),
+        0xC4 => Instruction::Call(Some(FlagCondition::NZ)),
+        0xCC => Instruction::Call(Some(FlagCondition::Z)),
         0xCD => Instruction::Call(None),
 
-        0xD4 => Instruction::Call(Some(Condition::NC)),
-        0xDC => Instruction::Call(Some(Condition::C)),
+        0xD4 => Instruction::Call(Some(FlagCondition::NC)),
+        0xDC => Instruction::Call(Some(FlagCondition::C)),
         _ => return None,
     })
 }
@@ -233,23 +238,23 @@ fn try_decode_relative_jump_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
         0x18 => Instruction::JumpRelative(None),
 
-        0x20 => Instruction::JumpRelative(Some(Condition::NZ)),
-        0x28 => Instruction::JumpRelative(Some(Condition::Z)),
+        0x20 => Instruction::JumpRelative(Some(FlagCondition::NZ)),
+        0x28 => Instruction::JumpRelative(Some(FlagCondition::Z)),
 
-        0x30 => Instruction::JumpRelative(Some(Condition::NC)),
-        0x38 => Instruction::JumpRelative(Some(Condition::C)),
+        0x30 => Instruction::JumpRelative(Some(FlagCondition::NC)),
+        0x38 => Instruction::JumpRelative(Some(FlagCondition::C)),
         _ => return None,
     })
 }
 
 fn try_decode_ret_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0xC0 => Instruction::Ret(Some(Condition::NZ)),
-        0xC8 => Instruction::Ret(Some(Condition::Z)),
+        0xC0 => Instruction::Ret(Some(FlagCondition::NZ)),
+        0xC8 => Instruction::Ret(Some(FlagCondition::Z)),
         0xC9 => Instruction::Ret(None),
 
-        0xD0 => Instruction::Ret(Some(Condition::NC)),
-        0xD8 => Instruction::Ret(Some(Condition::C)),
+        0xD0 => Instruction::Ret(Some(FlagCondition::NC)),
+        0xD8 => Instruction::Ret(Some(FlagCondition::C)),
 
         0xD9 => todo!("RETI"),
         _ => return None,
@@ -278,21 +283,19 @@ fn try_decode_pop_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_inc_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0x03 => Instruction::Inc(IncTarget::RegisterU16(RegisterU16::BC)),
-        0x04 => Instruction::Inc(IncTarget::RegisterU8(RegisterU8::B)),
-        0x0C => Instruction::Inc(IncTarget::RegisterU8(RegisterU8::C)),
+        0x03 => Instruction::IncU16(IncU16Target::RegisterU16(RegisterU16::BC)),
+        0x13 => Instruction::IncU16(IncU16Target::RegisterU16(RegisterU16::DE)),
+        0x23 => Instruction::IncU16(IncU16Target::RegisterU16(RegisterU16::HL)),
+        0x33 => Instruction::IncU16(IncU16Target::StackPointer),
 
-        0x13 => Instruction::Inc(IncTarget::RegisterU16(RegisterU16::DE)),
-        0x14 => Instruction::Inc(IncTarget::RegisterU8(RegisterU8::D)),
-        0x1C => Instruction::Inc(IncTarget::RegisterU8(RegisterU8::E)),
-
-        0x23 => Instruction::Inc(IncTarget::RegisterU16(RegisterU16::HL)),
-        0x24 => Instruction::Inc(IncTarget::RegisterU8(RegisterU8::H)),
-        0x2C => Instruction::Inc(IncTarget::RegisterU8(RegisterU8::L)),
-
-        0x33 => Instruction::Inc(IncTarget::StackPointer),
-        0x34 => Instruction::Inc(IncTarget::Address(RegisterU16::HL)),
-        0x3C => Instruction::Inc(IncTarget::RegisterU8(RegisterU8::A)),
+        0x04 => Instruction::IncU8(IncU8Target::RegisterU8(RegisterU8::B)),
+        0x0C => Instruction::IncU8(IncU8Target::RegisterU8(RegisterU8::C)),
+        0x14 => Instruction::IncU8(IncU8Target::RegisterU8(RegisterU8::D)),
+        0x1C => Instruction::IncU8(IncU8Target::RegisterU8(RegisterU8::E)),
+        0x24 => Instruction::IncU8(IncU8Target::RegisterU8(RegisterU8::H)),
+        0x2C => Instruction::IncU8(IncU8Target::RegisterU8(RegisterU8::L)),
+        0x34 => Instruction::IncU8(IncU8Target::Address(RegisterU16::HL)),
+        0x3C => Instruction::IncU8(IncU8Target::RegisterU8(RegisterU8::A)),
         _ => return None,
     })
 }
