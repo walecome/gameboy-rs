@@ -56,6 +56,7 @@ pub enum LoadDstU16 {
     ImmediateAddress,
 }
 
+#[derive(Debug)]
 pub enum Condition {
     NZ,
     NC,
@@ -63,6 +64,7 @@ pub enum Condition {
     C,
 }
 
+#[derive(Debug)]
 pub enum IncTarget {
     RegisterU16(RegisterU16),
     RegisterU8(RegisterU8),
@@ -70,6 +72,7 @@ pub enum IncTarget {
     StackPointer,
 }
 
+#[derive(Debug)]
 pub enum Instruction {
     Noop,
     Halt,
