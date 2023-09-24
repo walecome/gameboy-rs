@@ -6,20 +6,16 @@ use clap::Parser;
 
 use gameboy::header::Header;
 use gameboy::instruction_decoder::{
-    decode,
-    Instruction,
-    LoadDstU16,
-    LoadDstU8,
-    LoadSrcU16,
-    LoadSrcU8,
-    RegisterU16,
-    RegisterU8, IncTarget,
+    decode, IncTarget, Instruction, LoadDstU16, LoadDstU8, LoadSrcU16, LoadSrcU8, RegisterU16,
+    RegisterU8,
 };
 
 #[derive(Parser)]
 struct Args {
     #[arg(long)]
     rom: PathBuf,
+    #[arg(long)]
+    reference: Option<PathBuf>,
 }
 
 struct Memory {
@@ -27,7 +23,6 @@ struct Memory {
 }
 
 impl Memory {
-
     fn get(&self, address: u16) -> u8 {
         self.data[address as usize]
     }
@@ -103,12 +98,21 @@ struct CPU<'a> {
 }
 
 impl CPU<'_> {
-    fn tick(&mut self) -> bool {
+    fn tick(&mut self, maybe_metadata: Option<&ReferenceMetadata>) -> bool {
         let pc = self.pc;
         let opcode = self.read_u8();
         let instruction =
             decode(opcode).expect(format!("Unknown opcode: {:#06X}: {:#04X}", pc, opcode).as_str());
         println!("{:#06X}: {:#04X} ({:?})", pc, opcode, instruction);
+
+        if let Some(metadata) = maybe_metadata {
+            if pc != metadata.pc {
+                panic!(
+                    "PC({:#06X}) != reference PC ({:#06X}). Metadata: {}",
+                    pc, metadata.pc, metadata.instruction
+                );
+            }
+        }
 
         match instruction {
             Instruction::Noop => {}
@@ -153,12 +157,10 @@ impl CPU<'_> {
             Instruction::Push(reg) => {
                 self.push(reg);
             }
-            Instruction::Pop(reg) => {
-                self.pop(reg)
-            }
+            Instruction::Pop(reg) => self.pop(reg),
             Instruction::Inc(target) => {
                 self.inc(target);
-            },
+            }
         }
 
         return true;
@@ -205,38 +207,34 @@ impl CPU<'_> {
 
     fn read_u8_target(&mut self, target: LoadSrcU8) -> u8 {
         match target {
-            LoadSrcU8::Register(reg) => {
-                *self.resolve_u8_reg(reg)
-            },
+            LoadSrcU8::Register(reg) => *self.resolve_u8_reg(reg),
             LoadSrcU8::AddressU16(reg) => {
                 let address = self.resolve_u16_reg(&reg).get();
                 self.memory.get(address)
-            },
+            }
             LoadSrcU8::AddressU8(reg) => {
                 let lower_address = *self.resolve_u8_reg(reg);
                 self.memory.get_from_u8(lower_address)
-            },
+            }
             LoadSrcU8::ImmediateAddressU8 => {
                 let lower_address = self.read_u8();
                 self.memory.get_from_u8(lower_address)
-            },
+            }
             LoadSrcU8::ImmediateAddressU16 => {
                 let address = self.read_u16();
                 self.memory.get(address)
-            },
-            LoadSrcU8::ImmediateU8 => {
-                self.read_u8()
             }
+            LoadSrcU8::ImmediateU8 => self.read_u8(),
             LoadSrcU8::AddressU16Increment(reg) => {
                 let address = self.resolve_u16_reg(&reg).get();
                 self.resolve_u16_reg(&reg).set(address + 1);
                 self.memory.get(address)
-            },
+            }
             LoadSrcU8::AddressU16Decrement(reg) => {
                 let address = self.resolve_u16_reg(&reg).get();
                 self.resolve_u16_reg(&reg).set(address - 1);
                 self.memory.get(address)
-            },
+            }
         }
     }
 
@@ -244,47 +242,41 @@ impl CPU<'_> {
         match target {
             LoadDstU8::Register(reg) => {
                 *self.resolve_u8_reg(reg) = value;
-            },
+            }
             LoadDstU8::AddressU8(reg) => {
                 let lower_address = *self.resolve_u8_reg(reg);
                 self.memory.set_from_u8(lower_address, value);
-            },
+            }
             LoadDstU8::AddressU16(reg) => {
                 let address = self.resolve_u16_reg(&reg).get();
                 self.memory.set(address, value);
-            },
+            }
             LoadDstU8::AddressU16Increment(reg) => {
                 let address = self.resolve_u16_reg(&reg).get();
                 self.resolve_u16_reg(&reg).set(address + 1);
                 self.memory.set(address, value);
-            },
+            }
             LoadDstU8::AddressU16Decrement(reg) => {
                 let address = self.resolve_u16_reg(&reg).get();
                 self.resolve_u16_reg(&reg).set(address - 1);
                 self.memory.set(address, value);
-            },
+            }
             LoadDstU8::ImmediateAddressU8 => {
                 let lower_address = self.read_u8();
                 self.memory.set_from_u8(lower_address, value);
-            },
+            }
             LoadDstU8::ImmediateAddressU16 => {
                 let address = self.read_u16();
                 self.memory.set(address, value);
-            },
+            }
         }
     }
 
     fn read_u16_target(&mut self, target: LoadSrcU16) -> u16 {
         match target {
-            LoadSrcU16::Register(reg) => {
-                self.resolve_u16_reg(&reg).get()
-            },
-            LoadSrcU16::ImmediateU16 => {
-                self.read_u16()
-            },
-            LoadSrcU16::StackPointer => {
-                self.sp
-            },
+            LoadSrcU16::Register(reg) => self.resolve_u16_reg(&reg).get(),
+            LoadSrcU16::ImmediateU16 => self.read_u16(),
+            LoadSrcU16::StackPointer => self.sp,
             LoadSrcU16::StackPointerWithOffset => {
                 let offset = self.read_u8() as i32;
                 let signed_sp = self.sp as i32;
@@ -297,14 +289,14 @@ impl CPU<'_> {
         match target {
             LoadDstU16::Register(reg) => {
                 self.resolve_u16_reg(&reg).set(value);
-            },
+            }
             LoadDstU16::StackPointer => {
                 self.sp = value;
-            },
+            }
             LoadDstU16::ImmediateAddress => {
                 let address = self.read_u16();
                 self.memory.set_u16(address, value);
-            },
+            }
         }
     }
 
@@ -355,24 +347,63 @@ impl CPU<'_> {
             IncTarget::RegisterU8(reg) => {
                 let current = self.resolve_u8_reg(reg);
                 *current = *current + 1;
-            },
+            }
             IncTarget::Address(reg) => {
                 let address = self.resolve_u16_reg(&reg).get();
                 let value = self.memory.get(address);
                 self.memory.set(address, value + 1);
-            },
+            }
             IncTarget::StackPointer => {
                 self.sp += 1;
-            },
+            }
         }
     }
 }
 
-fn main() {
+struct ReferenceMetadata {
+    pc: u16,
+    instruction: String,
+}
+
+fn get_reference_metadata(reference: &PathBuf) -> Vec<ReferenceMetadata> {
+    fs::read_to_string(reference)
+        .unwrap()
+        .lines()
+        .enumerate()
+        .map(|(i, line)| {
+            let parts: Vec<&str> = line.split(": ").collect();
+            let pc = u16::from_str_radix(
+                parts[0]
+                    .strip_prefix("0x")
+                    .expect(format!("{}: {}", i, line).as_str()),
+                16,
+            );
+            if pc.is_err() {
+                panic!("{} could not be made to hex", parts[0]);
+            }
+            let instruction = parts[1].to_owned();
+            ReferenceMetadata {
+                pc: pc.unwrap(),
+                instruction,
+            }
+        })
+        .collect()
+}
+
+fn main() -> ! {
     let args = Args::parse();
+
+    let maybe_reference_metadata: Option<Vec<ReferenceMetadata>> = if let Some(reference) = args.reference {
+        Some(get_reference_metadata(&reference))
+    } else {
+        None
+    };
+
     let rom_data = fs::read(args.rom).unwrap();
     let header = Header::read_from_rom(&rom_data).unwrap();
     println!("{:?}", header);
+
+    let mut index = 0;
 
     let mut cpu = CPU {
         rom_data: &rom_data,
@@ -392,6 +423,12 @@ fn main() {
         interrupts_enabled: false,
     };
     loop {
-        cpu.tick();
+        let current_metadata = if let Some(reference_metadata) = &maybe_reference_metadata {
+            Some(&reference_metadata[index])
+        } else {
+            None
+        };
+        cpu.tick(current_metadata);
+        index += 1;
     }
 }
