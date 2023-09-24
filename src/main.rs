@@ -97,8 +97,9 @@ struct CPU<'a> {
 
 impl CPU<'_> {
     fn tick(&mut self) -> bool {
+        let pc = self.pc;
         let opcode = self.read_u8();
-        println!("opcode: {:#04X}", opcode);
+        println!("{:#06X}: {:#04X}", pc, opcode);
         let instruction =
             decode(opcode).expect(format!("Unknown opcode: {:#04X}", opcode).as_str());
 
