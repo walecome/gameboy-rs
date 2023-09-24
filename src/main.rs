@@ -31,8 +31,18 @@ impl Memory {
         self.data[address as usize] = value;
     }
 
+    fn set_from_u8(&mut self, lower_address: u8, value: u8) {
+        let address = 0xFF00 + (lower_address as u16);
+        self.data[address as usize] = value;
+    }
+
     fn get(&self, address: u16) -> u8 {
         self.data[address as usize]
+    }
+
+    fn get_from_u8(&self, lower_address: u8) -> u8 {
+        let address = 0xFF00 + (lower_address as u16);
+        self.data[(address) as usize]
     }
 
     fn set_u16(&mut self, address: u16, value: u16) {
@@ -90,13 +100,6 @@ impl CPU<'_> {
         println!("opcode: {:#04X}", opcode);
         let instruction =
             decode(opcode).expect(format!("Unknown opcode: {:#04X}", opcode).as_str());
-        let should_halt = match instruction {
-            Instruction::Halt => true,
-            _ => false,
-        };
-        if should_halt {
-            return false;
-        }
 
         match instruction {
             Instruction::Noop => {}
@@ -104,8 +107,9 @@ impl CPU<'_> {
                 let value = self.read_u8_target(src);
                 self.write_u8_target(dst, value);
             }
-
-            Instruction::Halt => panic!("Should be caught above"),
+            Instruction::Halt => {
+                return false;
+            }
             Instruction::JumpImmediate => {
                 let address = self.read_u16();
                 self.pc = address;
@@ -149,7 +153,7 @@ impl CPU<'_> {
         }
     }
 
-    fn resolve_u16_reg(&mut self, reg: RegisterU16) -> RegisterPair {
+    fn resolve_u16_reg(&mut self, reg: &RegisterU16) -> RegisterPair {
         let (high, low) = match reg {
             RegisterU16::AF => (&mut self.a, &mut self.f),
             RegisterU16::BC => (&mut self.b, &mut self.c),
@@ -161,44 +165,106 @@ impl CPU<'_> {
 
     fn read_u8_target(&mut self, target: LoadSrcU8) -> u8 {
         match target {
-            LoadSrcU8::Register(_) => todo!(),
-            LoadSrcU8::AddressU16(_) => todo!(),
-            LoadSrcU8::AddressU8(_) => todo!(),
-            LoadSrcU8::ImmediateAddressU8 => todo!(),
-            LoadSrcU8::ImmediateAddressU16 => todo!(),
-            LoadSrcU8::ImmediateU8 => todo!(),
-            LoadSrcU8::AddressU16Increment(_) => todo!(),
-            LoadSrcU8::AddressU16Decrement(_) => todo!(),
+            LoadSrcU8::Register(reg) => {
+                *self.resolve_u8_reg(reg)
+            },
+            LoadSrcU8::AddressU16(reg) => {
+                let address = self.resolve_u16_reg(&reg).get();
+                self.memory.get(address)
+            },
+            LoadSrcU8::AddressU8(reg) => {
+                let lower_address = *self.resolve_u8_reg(reg);
+                self.memory.get_from_u8(lower_address)
+            },
+            LoadSrcU8::ImmediateAddressU8 => {
+                let lower_address = self.read_u8();
+                self.memory.get_from_u8(lower_address)
+            },
+            LoadSrcU8::ImmediateAddressU16 => {
+                let address = self.read_u16();
+                self.memory.get(address)
+            },
+            LoadSrcU8::ImmediateU8 => {
+                self.read_u8()
+            }
+            LoadSrcU8::AddressU16Increment(reg) => {
+                let address = self.resolve_u16_reg(&reg).get();
+                self.resolve_u16_reg(&reg).set(address + 1);
+                self.memory.get(address)
+            },
+            LoadSrcU8::AddressU16Decrement(reg) => {
+                let address = self.resolve_u16_reg(&reg).get();
+                self.resolve_u16_reg(&reg).set(address - 1);
+                self.memory.get(address)
+            },
         }
     }
 
     fn write_u8_target(&mut self, target: LoadDstU8, value: u8) {
         match target {
-            LoadDstU8::Register(_) => todo!(),
-            LoadDstU8::AddressHL => todo!(),
-            LoadDstU8::AddressU8(_) => todo!(),
-            LoadDstU8::AddressU16(_) => todo!(),
-            LoadDstU8::AddressU16Increment(_) => todo!(),
-            LoadDstU8::AddressU16Decrement(_) => todo!(),
-            LoadDstU8::ImmediateAddressU8 => todo!(),
-            LoadDstU8::ImmediateAddressU16 => todo!(),
+            LoadDstU8::Register(reg) => {
+                *self.resolve_u8_reg(reg) = value;
+            },
+            LoadDstU8::AddressU8(reg) => {
+                let lower_address = *self.resolve_u8_reg(reg);
+                self.memory.set_from_u8(lower_address, value);
+            },
+            LoadDstU8::AddressU16(reg) => {
+                let address = self.resolve_u16_reg(&reg).get();
+                self.memory.set(address, value);
+            },
+            LoadDstU8::AddressU16Increment(reg) => {
+                let address = self.resolve_u16_reg(&reg).get();
+                self.resolve_u16_reg(&reg).set(address + 1);
+                self.memory.set(address, value);
+            },
+            LoadDstU8::AddressU16Decrement(reg) => {
+                let address = self.resolve_u16_reg(&reg).get();
+                self.resolve_u16_reg(&reg).set(address - 1);
+                self.memory.set(address, value);
+            },
+            LoadDstU8::ImmediateAddressU8 => {
+                let lower_address = self.read_u8();
+                self.memory.set_from_u8(lower_address, value);
+            },
+            LoadDstU8::ImmediateAddressU16 => {
+                let address = self.read_u16();
+                self.memory.set(address, value);
+            },
         }
     }
 
     fn read_u16_target(&mut self, target: LoadSrcU16) -> u16 {
         match target {
-            LoadSrcU16::Register(_) => todo!(),
-            LoadSrcU16::ImmediateU16 => todo!(),
-            LoadSrcU16::StackPointer => todo!(),
-            LoadSrcU16::StackPointerWithOffset => todo!(),
+            LoadSrcU16::Register(reg) => {
+                self.resolve_u16_reg(&reg).get()
+            },
+            LoadSrcU16::ImmediateU16 => {
+                self.read_u16()
+            },
+            LoadSrcU16::StackPointer => {
+                self.sp
+            },
+            LoadSrcU16::StackPointerWithOffset => {
+                let offset = self.read_u8() as i32;
+                let signed_sp = self.sp as i32;
+                (signed_sp + offset) as u16
+            }
         }
     }
 
     fn write_u16_target(&mut self, target: LoadDstU16, value: u16) {
         match target {
-            LoadDstU16::Register(_) => todo!(),
-            LoadDstU16::StackPointer => todo!(),
-            LoadDstU16::Address => todo!(),
+            LoadDstU16::Register(reg) => {
+                self.resolve_u16_reg(&reg).set(value);
+            },
+            LoadDstU16::StackPointer => {
+                self.sp = value;
+            },
+            LoadDstU16::ImmediateAddress => {
+                let address = self.read_u16();
+                self.memory.set_u16(address, value);
+            },
         }
     }
 }

@@ -29,7 +29,6 @@ pub enum LoadSrcU8 {
 
 pub enum LoadDstU8 {
     Register(RegisterU8),
-    AddressHL,
     AddressU8(RegisterU8),
     AddressU16(RegisterU16),
     AddressU16Increment(RegisterU16),
@@ -48,7 +47,7 @@ pub enum LoadSrcU16 {
 pub enum LoadDstU16 {
     Register(RegisterU16),
     StackPointer,
-    Address,
+    ImmediateAddress,
 }
 
 pub enum Instruction {
@@ -61,11 +60,6 @@ pub enum Instruction {
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
-    if (row_mask, col_mask) == (0x7, 0x6) {
-        // HALT
-        return None;
-    }
-
     Some(match (row_mask, col_mask) {
         (0x0..=0x3, 0x2) => LoadSrcU8::Register(RegisterU8::A),
 
@@ -84,7 +78,8 @@ fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
         (0x4..=0x7, 0x3 | 0xB) => LoadSrcU8::Register(RegisterU8::E),
         (0x4..=0x7, 0x4 | 0xC) => LoadSrcU8::Register(RegisterU8::H),
         (0x4..=0x7, 0x5 | 0xD) => LoadSrcU8::Register(RegisterU8::L),
-        (0x4..=0x7, 0x6 | 0xE) => LoadSrcU8::AddressU16(RegisterU16::HL),
+        (0x4..=0x6, 0x6) => LoadSrcU8::AddressU16(RegisterU16::HL),
+        (0x4..=0x7, 0xE) => LoadSrcU8::AddressU16(RegisterU16::HL),
         (0x4..=0x7, 0x7 | 0xF) => LoadSrcU8::Register(RegisterU8::A),
 
 
@@ -110,7 +105,7 @@ fn try_decode_u8_load_dst(row_mask: u8, col_mask: u8) -> Option<LoadDstU8> {
         (0x0, 0x6) => LoadDstU8::Register(RegisterU8::B),
         (0x1, 0x6) => LoadDstU8::Register(RegisterU8::D),
         (0x2, 0x6) => LoadDstU8::Register(RegisterU8::H),
-        (0x3, 0x6) => LoadDstU8::AddressHL,
+        (0x3, 0x6) => LoadDstU8::AddressU16(RegisterU16::HL),
 
         (0x0..=0x3, 0xA) => LoadDstU8::Register(RegisterU8::A),
 
@@ -122,7 +117,7 @@ fn try_decode_u8_load_dst(row_mask: u8, col_mask: u8) -> Option<LoadDstU8> {
         (0x4, 0x0..=0x7) => LoadDstU8::Register(RegisterU8::B),
         (0x5, 0x0..=0x7) => LoadDstU8::Register(RegisterU8::D),
         (0x6, 0x0..=0x7) => LoadDstU8::Register(RegisterU8::H),
-        (0x7, 0x0..=0x7) => LoadDstU8::AddressHL,
+        (0x7, 0x0..=0x7) => LoadDstU8::AddressU16(RegisterU16::HL),
 
         (0x4, 0x8..=0xF) => LoadDstU8::Register(RegisterU8::C),
         (0x5, 0x8..=0xF) => LoadDstU8::Register(RegisterU8::E),
@@ -170,7 +165,7 @@ fn try_decode_u16_load_instruction(opcode: u8) -> Option<Instruction> {
             src: LoadSrcU16::ImmediateU16,
         }),
         0x08 => Some(Instruction::LoadU16 {
-            dst: LoadDstU16::Address,
+            dst: LoadDstU16::ImmediateAddress,
             src: LoadSrcU16::StackPointer,
         }),
         0xF8 => Some(Instruction::LoadU16 {
