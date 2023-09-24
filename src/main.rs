@@ -7,7 +7,7 @@ use clap::Parser;
 use gameboy::header::Header;
 use gameboy::instruction_decoder::{
     decode, IncTarget, Instruction, LoadDstU16, LoadDstU8, LoadSrcU16, LoadSrcU8, RegisterU16,
-    RegisterU8,
+    RegisterU8, LogicalOpTarget,
 };
 
 #[derive(Parser)]
@@ -81,6 +81,13 @@ impl RegisterPair<'_> {
     }
 }
 
+struct Flags {
+    z: bool,
+    n: bool,
+    h: bool,
+    c: bool,
+}
+
 struct CPU<'a> {
     rom_data: &'a Vec<u8>,
     pc: u16,
@@ -95,6 +102,7 @@ struct CPU<'a> {
     h: u8,
     l: u8,
     interrupts_enabled: bool,
+    flags: Flags,
 }
 
 impl CPU<'_> {
@@ -161,6 +169,9 @@ impl CPU<'_> {
             Instruction::Inc(target) => {
                 self.inc(target);
             }
+            Instruction::Or(target) => {
+                self.or(target);
+            },
         }
 
         return true;
@@ -358,6 +369,23 @@ impl CPU<'_> {
             }
         }
     }
+
+    fn or(&mut self, target: LogicalOpTarget) {
+        let value = match target {
+            LogicalOpTarget::Register(reg) => *self.resolve_u8_reg(reg),
+            LogicalOpTarget::AddressHL => {
+                let address = self.resolve_u16_reg(&RegisterU16::HL).get();
+                self.memory.get(address)
+            }
+            LogicalOpTarget::ImmediateU8 => self.read_u8(),
+        };
+        self.a = self.a | value;
+        self.flags.z = self.a == 0;
+        self.flags.h = false;
+        self.flags.c = false;
+        self.flags.n = false;
+    }
+
 }
 
 struct ReferenceMetadata {
@@ -421,6 +449,7 @@ fn main() -> ! {
         h: 0x00,
         l: 0x00,
         interrupts_enabled: false,
+        flags: Flags { z: false, n: false, h: false, c: false },
     };
     loop {
         let current_metadata = if let Some(reference_metadata) = &maybe_reference_metadata {

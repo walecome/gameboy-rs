@@ -73,6 +73,13 @@ pub enum IncTarget {
 }
 
 #[derive(Debug)]
+pub enum LogicalOpTarget {
+    Register(RegisterU8),
+    AddressHL,
+    ImmediateU8,
+}
+
+#[derive(Debug)]
 pub enum Instruction {
     Noop,
     Halt,
@@ -86,6 +93,7 @@ pub enum Instruction {
     Push(RegisterU16),
     Pop(RegisterU16),
     Inc(IncTarget),
+    Or(LogicalOpTarget),
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
@@ -289,6 +297,22 @@ fn try_decode_inc_instruction(opcode: u8) -> Option<Instruction> {
     })
 }
 
+fn try_decode_or_instruction(opcode: u8) -> Option<Instruction> {
+    Some(match opcode {
+        0xB0 => Instruction::Or(LogicalOpTarget::Register(RegisterU8::B)),
+        0xB1 => Instruction::Or(LogicalOpTarget::Register(RegisterU8::C)),
+        0xB2 => Instruction::Or(LogicalOpTarget::Register(RegisterU8::D)),
+        0xB3 => Instruction::Or(LogicalOpTarget::Register(RegisterU8::E)),
+        0xB4 => Instruction::Or(LogicalOpTarget::Register(RegisterU8::H)),
+        0xB5 => Instruction::Or(LogicalOpTarget::Register(RegisterU8::L)),
+        0xB6 => Instruction::Or(LogicalOpTarget::AddressHL),
+        0xB7 => Instruction::Or(LogicalOpTarget::Register(RegisterU8::A)),
+
+        0xF6 => Instruction::Or(LogicalOpTarget::ImmediateU8),
+        _ => return None,
+    })
+}
+
 // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 pub fn decode(opcode: u8) -> Option<Instruction> {
     if let Some(instruction) = try_decode_u8_load_instruction(opcode) {
@@ -320,6 +344,10 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
     }
 
     if let Some(instruction) = try_decode_inc_instruction(opcode) {
+        return Some(instruction);
+    }
+
+    if let Some(instruction) = try_decode_or_instruction(opcode) {
         return Some(instruction);
     }
 
