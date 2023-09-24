@@ -63,6 +63,13 @@ pub enum Condition {
     C,
 }
 
+pub enum IncTarget {
+    RegisterU16(RegisterU16),
+    RegisterU8(RegisterU8),
+    Address(RegisterU16),
+    StackPointer,
+}
+
 pub enum Instruction {
     Noop,
     Halt,
@@ -75,6 +82,7 @@ pub enum Instruction {
     Ret(Option<Condition>),
     Push(RegisterU16),
     Pop(RegisterU16),
+    Inc(IncTarget),
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
@@ -257,6 +265,27 @@ fn try_decode_pop_instruction(opcode: u8) -> Option<Instruction> {
     })
 }
 
+fn try_decode_inc_instruction(opcode: u8) -> Option<Instruction> {
+    Some(match opcode {
+        0x03 => Instruction::Inc(IncTarget::RegisterU16(RegisterU16::BC)),
+        0x04 => Instruction::Inc(IncTarget::RegisterU8(RegisterU8::B)),
+        0x0C => Instruction::Inc(IncTarget::RegisterU8(RegisterU8::C)),
+
+        0x13 => Instruction::Inc(IncTarget::RegisterU16(RegisterU16::DE)),
+        0x14 => Instruction::Inc(IncTarget::RegisterU8(RegisterU8::D)),
+        0x1C => Instruction::Inc(IncTarget::RegisterU8(RegisterU8::E)),
+
+        0x23 => Instruction::Inc(IncTarget::RegisterU16(RegisterU16::HL)),
+        0x24 => Instruction::Inc(IncTarget::RegisterU8(RegisterU8::H)),
+        0x2C => Instruction::Inc(IncTarget::RegisterU8(RegisterU8::L)),
+
+        0x33 => Instruction::Inc(IncTarget::StackPointer),
+        0x34 => Instruction::Inc(IncTarget::Address(RegisterU16::HL)),
+        0x3C => Instruction::Inc(IncTarget::RegisterU8(RegisterU8::A)),
+        _ => return None,
+    })
+}
+
 // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 pub fn decode(opcode: u8) -> Option<Instruction> {
     if let Some(instruction) = try_decode_u8_load_instruction(opcode) {
@@ -284,6 +313,10 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
     }
 
     if let Some(instruction) = try_decode_pop_instruction(opcode) {
+        return Some(instruction);
+    }
+
+    if let Some(instruction) = try_decode_inc_instruction(opcode) {
         return Some(instruction);
     }
 

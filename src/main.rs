@@ -13,7 +13,7 @@ use gameboy::instruction_decoder::{
     LoadSrcU16,
     LoadSrcU8,
     RegisterU16,
-    RegisterU8,
+    RegisterU8, IncTarget,
 };
 
 #[derive(Parser)]
@@ -156,6 +156,9 @@ impl CPU<'_> {
             Instruction::Pop(reg) => {
                 self.pop(reg)
             }
+            Instruction::Inc(target) => {
+                self.inc(target);
+            },
         }
 
         return true;
@@ -341,6 +344,27 @@ impl CPU<'_> {
     fn pop(&mut self, reg: RegisterU16) {
         let value = self.stack_pop();
         self.resolve_u16_reg(&reg).set(value);
+    }
+
+    fn inc(&mut self, target: IncTarget) {
+        match target {
+            IncTarget::RegisterU16(reg) => {
+                let current = self.resolve_u16_reg(&reg).get();
+                self.resolve_u16_reg(&reg).set(current + 1);
+            }
+            IncTarget::RegisterU8(reg) => {
+                let current = self.resolve_u8_reg(reg);
+                *current = *current + 1;
+            },
+            IncTarget::Address(reg) => {
+                let address = self.resolve_u16_reg(&reg).get();
+                let value = self.memory.get(address);
+                self.memory.set(address, value + 1);
+            },
+            IncTarget::StackPointer => {
+                self.sp += 1;
+            },
+        }
     }
 }
 
