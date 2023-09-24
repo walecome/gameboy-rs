@@ -74,6 +74,7 @@ pub enum Instruction {
     JumpRelative(Option<Condition>),
     Ret(Option<Condition>),
     Push(RegisterU16),
+    Pop(RegisterU16),
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
@@ -246,6 +247,16 @@ fn try_decode_push_instruction(opcode: u8) -> Option<Instruction> {
     })
 }
 
+fn try_decode_pop_instruction(opcode: u8) -> Option<Instruction> {
+    Some(match opcode {
+        0xC1 => Instruction::Pop(RegisterU16::BC),
+        0xD1 => Instruction::Pop(RegisterU16::DE),
+        0xE1 => Instruction::Pop(RegisterU16::HL),
+        0xF1 => Instruction::Pop(RegisterU16::AF),
+        _ => return None,
+    })
+}
+
 // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 pub fn decode(opcode: u8) -> Option<Instruction> {
     if let Some(instruction) = try_decode_u8_load_instruction(opcode) {
@@ -269,6 +280,10 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
     }
 
     if let Some(instruction) = try_decode_push_instruction(opcode) {
+        return Some(instruction);
+    }
+
+    if let Some(instruction) = try_decode_pop_instruction(opcode) {
         return Some(instruction);
     }
 

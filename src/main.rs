@@ -153,6 +153,9 @@ impl CPU<'_> {
             Instruction::Push(reg) => {
                 self.push(reg);
             }
+            Instruction::Pop(reg) => {
+                self.pop(reg)
+            }
         }
 
         return true;
@@ -333,6 +336,11 @@ impl CPU<'_> {
     fn push(&mut self, reg: RegisterU16) {
         let value = self.resolve_u16_reg(&reg).get();
         self.stack_push(value);
+    }
+
+    fn pop(&mut self, reg: RegisterU16) {
+        let value = self.stack_pop();
+        self.resolve_u16_reg(&reg).set(value);
     }
 }
 
