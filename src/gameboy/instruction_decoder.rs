@@ -56,21 +56,7 @@ pub enum LoadDstU16 {
     ImmediateAddress,
 }
 
-pub enum CallCondition {
-    NZ,
-    NC,
-    Z,
-    C,
-}
-
-pub enum JumpCondition {
-    NZ,
-    NC,
-    Z,
-    C,
-}
-
-pub enum RetCondition {
+pub enum Condition {
     NZ,
     NC,
     Z,
@@ -84,9 +70,9 @@ pub enum Instruction {
     LoadU16 { dst: LoadDstU16, src: LoadSrcU16 },
     JumpImmediate,
     DisableInterrupts,
-    Call(Option<CallCondition>),
-    JumpRelative(Option<JumpCondition>),
-    Ret(Option<RetCondition>),
+    Call(Option<Condition>),
+    JumpRelative(Option<Condition>),
+    Ret(Option<Condition>),
     Push(RegisterU16),
 }
 
@@ -213,12 +199,12 @@ fn try_decode_u16_load_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_call_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0xC4 => Instruction::Call(Some(CallCondition::NZ)),
-        0xCC => Instruction::Call(Some(CallCondition::Z)),
+        0xC4 => Instruction::Call(Some(Condition::NZ)),
+        0xCC => Instruction::Call(Some(Condition::Z)),
         0xCD => Instruction::Call(None),
 
-        0xD4 => Instruction::Call(Some(CallCondition::NC)),
-        0xDC => Instruction::Call(Some(CallCondition::C)),
+        0xD4 => Instruction::Call(Some(Condition::NC)),
+        0xDC => Instruction::Call(Some(Condition::C)),
         _ => return None,
     })
 }
@@ -227,23 +213,23 @@ fn try_decode_relative_jump_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
         0x18 => Instruction::JumpRelative(None),
 
-        0x20 => Instruction::JumpRelative(Some(JumpCondition::NZ)),
-        0x28 => Instruction::JumpRelative(Some(JumpCondition::Z)),
+        0x20 => Instruction::JumpRelative(Some(Condition::NZ)),
+        0x28 => Instruction::JumpRelative(Some(Condition::Z)),
 
-        0x30 => Instruction::JumpRelative(Some(JumpCondition::NC)),
-        0x38 => Instruction::JumpRelative(Some(JumpCondition::C)),
+        0x30 => Instruction::JumpRelative(Some(Condition::NC)),
+        0x38 => Instruction::JumpRelative(Some(Condition::C)),
         _ => return None,
     })
 }
 
 fn try_decode_ret_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0xC0 => Instruction::Ret(Some(RetCondition::NZ)),
-        0xC8 => Instruction::Ret(Some(RetCondition::Z)),
+        0xC0 => Instruction::Ret(Some(Condition::NZ)),
+        0xC8 => Instruction::Ret(Some(Condition::Z)),
         0xC9 => Instruction::Ret(None),
 
-        0xD0 => Instruction::Ret(Some(RetCondition::NC)),
-        0xD8 => Instruction::Ret(Some(RetCondition::C)),
+        0xD0 => Instruction::Ret(Some(Condition::NC)),
+        0xD8 => Instruction::Ret(Some(Condition::C)),
 
         0xD9 => todo!("RETI"),
         _ => return None,
