@@ -128,6 +128,14 @@ impl CPU<'_> {
                     self.call();
                 }
             }
+            Instruction::JumpRelative(condition) => {
+                if condition.is_some() {
+                    todo!("Implement call condition")
+                } else {
+                    let offset = self.read_u8();
+                    self.relative_jump(offset);
+                }
+            },
         }
 
         return true;
@@ -286,6 +294,13 @@ impl CPU<'_> {
     fn stack_push(&mut self, value: u16) {
         self.sp -= 2;
         self.memory.set_u16(self.sp, value);
+    }
+
+    fn relative_jump(&mut self, offset: u8) {
+        let signed_pc = self.pc as i32;
+        let signed_offset = offset as i32;
+        let new_pc = signed_pc + signed_offset;
+        self.pc = new_pc as u16;
     }
 }
 
