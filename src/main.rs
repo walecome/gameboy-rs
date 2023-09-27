@@ -372,12 +372,12 @@ impl CPU<'_> {
         let result = match target {
             IncU8Target::RegisterU8(reg) => {
                 let current = self.resolve_u8_reg(reg);
-                *current = *current + 1;
+                *current = current.wrapping_add(1);
                 *current
             }
             IncU8Target::Address(reg) => {
                 let address = self.resolve_u16_reg(&reg).get();
-                let value = self.memory.get(address) + 1;
+                let value = self.memory.get(address).wrapping_add(1);
                 self.memory.set(address, value);
                 value
             }
