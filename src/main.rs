@@ -7,7 +7,7 @@ use clap::Parser;
 use gameboy::header::Header;
 use gameboy::instruction_decoder::{
     decode, Instruction, LoadDstU16, LoadDstU8, LoadSrcU16, LoadSrcU8, RegisterU16,
-    RegisterU8, LogicalOpTarget, FlagCondition, IncDecU8Target, IncDecU16Target,
+    RegisterU8, LogicalOpTarget, FlagCondition, IncDecU8Target, U16Target,
 };
 
 #[derive(Parser)]
@@ -186,6 +186,9 @@ impl CPU<'_> {
             Instruction::DecU8(target) => self.dec_u8(target),
             Instruction::DecU16(target) => self.dec_u16(target),
             Instruction::Xor(target) => self.xor(target),
+            Instruction::AddStackPointer => self.add_stackpointer_immediate(),
+            Instruction::AddU8(target) => self.add_u8(target),
+            Instruction::AddU16(target) => self.add_u16(target)
         }
 
         return true;
@@ -391,14 +394,14 @@ impl CPU<'_> {
         self.flags.h = (result & 0x0F) == 0x00;
     }
 
-    fn inc_u16(&mut self, target: IncDecU16Target) {
+    fn inc_u16(&mut self, target: U16Target) {
         match target {
-            IncDecU16Target::RegisterU16(reg) => {
+            U16Target::RegisterU16(reg) => {
                 let current = self.resolve_u16_reg(&reg).get();
                 let value = current.wrapping_add(1);
                 self.resolve_u16_reg(&reg).set(value);
             }
-            IncDecU16Target::StackPointer => {
+            U16Target::StackPointer => {
                 self.sp += 1;
             }
         };
@@ -424,14 +427,14 @@ impl CPU<'_> {
         self.flags.h = (result & 0x0F) == 0x0F;
     }
 
-    fn dec_u16(&mut self, target: IncDecU16Target) {
+    fn dec_u16(&mut self, target: U16Target) {
         match target {
-            IncDecU16Target::RegisterU16(reg) => {
+            U16Target::RegisterU16(reg) => {
                 let current = self.resolve_u16_reg(&reg).get();
                 let value = current.wrapping_add(1);
                 self.resolve_u16_reg(&reg).set(value);
             }
-            IncDecU16Target::StackPointer => {
+            U16Target::StackPointer => {
                 self.sp += 1;
             }
         };
@@ -469,6 +472,51 @@ impl CPU<'_> {
         self.flags.n = false;
         self.flags.h = false;
         self.flags.c = false;
+    }
+
+    fn add_u8(&mut self, target: LogicalOpTarget) {
+        let value = self.resolve_logical_op_target(target);
+
+        let half_carry = (self.a & 0xF) + (value & 0xF) > 0xF;
+
+        let result = (self.a as u16) + (value as u16);
+
+        self.a = result as u8;
+
+        self.flags.z = self.a == 0;
+        self.flags.n = false;
+        self.flags.h = half_carry;
+        self.flags.c = result > 0xFF;
+    }
+
+    fn add_u16(&mut self, target: U16Target) {
+        let rhs = match target {
+            U16Target::RegisterU16(reg) => {
+                self.resolve_u16_reg(&reg).get()
+            },
+            U16Target::StackPointer => {
+                self.sp
+            }
+        };
+        let hl = self.resolve_u16_reg(&RegisterU16::HL).get();
+        let result = (hl as u32) + (rhs as u32);
+
+        self.flags.n = false;
+        self.flags.h = (hl & 0xFFF) + (rhs & 0xFFF) > 0xFFF;
+        self.flags.c = result > 0xFFFF;
+    }
+
+    fn add_stackpointer_immediate(&mut self) {
+        let offset = self.read_u8() as i8 as i16;
+        let signed_sp = self.sp as i16;
+        let result = signed_sp + offset;
+
+        let signed_mask = 0xFFFF as u16 as i16;
+
+        self.flags.z = false;
+        self.flags.n = false;
+        self.flags.h = ((signed_sp ^ offset ^ (result & signed_mask)) & 0x10) == 0x10;
+        self.flags.c = ((signed_sp ^ offset ^ (result & signed_mask)) & 0x100) == 0x100;
     }
 
     fn compare(&mut self, target: LogicalOpTarget) {

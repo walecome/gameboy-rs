@@ -71,7 +71,7 @@ pub enum IncDecU8Target {
 }
 
 #[derive(Debug)]
-pub enum IncDecU16Target {
+pub enum U16Target {
     RegisterU16(RegisterU16),
     StackPointer,
 }
@@ -97,13 +97,16 @@ pub enum Instruction {
     Push(RegisterU16),
     Pop(RegisterU16),
     IncU8(IncDecU8Target),
-    IncU16(IncDecU16Target),
+    IncU16(U16Target),
     Or(LogicalOpTarget),
     Compare(LogicalOpTarget),
     And(LogicalOpTarget),
     DecU8(IncDecU8Target),
-    DecU16(IncDecU16Target),
+    DecU16(U16Target),
     Xor(LogicalOpTarget),
+    AddStackPointer,
+    AddU8(LogicalOpTarget),
+    AddU16(U16Target),
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
@@ -288,10 +291,10 @@ fn try_decode_pop_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_inc_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0x03 => Instruction::IncU16(IncDecU16Target::RegisterU16(RegisterU16::BC)),
-        0x13 => Instruction::IncU16(IncDecU16Target::RegisterU16(RegisterU16::DE)),
-        0x23 => Instruction::IncU16(IncDecU16Target::RegisterU16(RegisterU16::HL)),
-        0x33 => Instruction::IncU16(IncDecU16Target::StackPointer),
+        0x03 => Instruction::IncU16(U16Target::RegisterU16(RegisterU16::BC)),
+        0x13 => Instruction::IncU16(U16Target::RegisterU16(RegisterU16::DE)),
+        0x23 => Instruction::IncU16(U16Target::RegisterU16(RegisterU16::HL)),
+        0x33 => Instruction::IncU16(U16Target::StackPointer),
 
         0x04 => Instruction::IncU8(IncDecU8Target::RegisterU8(RegisterU8::B)),
         0x14 => Instruction::IncU8(IncDecU8Target::RegisterU8(RegisterU8::D)),
@@ -356,10 +359,10 @@ fn try_decode_and_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_dec_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0x0B => Instruction::DecU16(IncDecU16Target::RegisterU16(RegisterU16::BC)),
-        0x1B => Instruction::DecU16(IncDecU16Target::RegisterU16(RegisterU16::DE)),
-        0x2B => Instruction::DecU16(IncDecU16Target::RegisterU16(RegisterU16::HL)),
-        0x3B => Instruction::DecU16(IncDecU16Target::StackPointer),
+        0x0B => Instruction::DecU16(U16Target::RegisterU16(RegisterU16::BC)),
+        0x1B => Instruction::DecU16(U16Target::RegisterU16(RegisterU16::DE)),
+        0x2B => Instruction::DecU16(U16Target::RegisterU16(RegisterU16::HL)),
+        0x3B => Instruction::DecU16(U16Target::StackPointer),
 
         0x05 => Instruction::DecU8(IncDecU8Target::RegisterU8(RegisterU8::B)),
         0x15 => Instruction::DecU8(IncDecU8Target::RegisterU8(RegisterU8::D)),
@@ -387,6 +390,30 @@ fn try_decode_xor_instruction(opcode: u8) -> Option<Instruction> {
         0xAF => Instruction::Xor(LogicalOpTarget::Register(RegisterU8::A)),
 
         0xEE => Instruction::Xor(LogicalOpTarget::ImmediateU8),
+        _ => return None,
+    })
+}
+
+fn try_decode_add_instruction(opcode: u8) -> Option<Instruction> {
+    Some(match opcode {
+
+        0x09 => Instruction::AddU16(U16Target::RegisterU16(RegisterU16::BC)),
+        0x19 => Instruction::AddU16(U16Target::RegisterU16(RegisterU16::DE)),
+        0x29 => Instruction::AddU16(U16Target::RegisterU16(RegisterU16::HL)),
+        0x39 => Instruction::AddU16(U16Target::StackPointer),
+
+        0xE8 => Instruction::AddStackPointer,
+
+        0x80 => Instruction::AddU8(LogicalOpTarget::Register(RegisterU8::B)),
+        0x81 => Instruction::AddU8(LogicalOpTarget::Register(RegisterU8::C)),
+        0x82 => Instruction::AddU8(LogicalOpTarget::Register(RegisterU8::D)),
+        0x83 => Instruction::AddU8(LogicalOpTarget::Register(RegisterU8::E)),
+        0x84 => Instruction::AddU8(LogicalOpTarget::Register(RegisterU8::H)),
+        0x85 => Instruction::AddU8(LogicalOpTarget::Register(RegisterU8::L)),
+        0x86 => Instruction::AddU8(LogicalOpTarget::AddressHL),
+        0x87 => Instruction::AddU8(LogicalOpTarget::Register(RegisterU8::A)),
+
+        0xC6 => Instruction::AddU8(LogicalOpTarget::ImmediateU8),
         _ => return None,
     })
 }
@@ -442,6 +469,10 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
     }
 
     if let Some(instruction) = try_decode_xor_instruction(opcode) {
+        return Some(instruction);
+    }
+
+    if let Some(instruction) = try_decode_add_instruction(opcode) {
         return Some(instruction);
     }
 
