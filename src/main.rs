@@ -1,6 +1,6 @@
 mod gameboy;
 
-use std::{fs, path::PathBuf};
+use std::{fs, fmt, path::PathBuf};
 
 use clap::Parser;
 
@@ -81,6 +81,7 @@ impl RegisterPair<'_> {
     }
 }
 
+#[derive(Debug)]
 struct Flags {
     z: bool,
     n: bool,
@@ -105,6 +106,27 @@ struct CPU<'a> {
     flags: Flags,
 }
 
+impl fmt::Debug for CPU<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CPU")
+         .field("rom_data", &"<omitted>".to_owned())
+         .field("pc", &format_args!("{:#06X}", &self.pc))
+         .field("sp", &format_args!("{:#06X}", &self.sp))
+         .field("memory", &"<omitted>".to_owned())
+         .field("a", &format_args!("{:#04X}", &self.a))
+         .field("b", &format_args!("{:#04X}", &self.b))
+         .field("c", &format_args!("{:#04X}", &self.c))
+         .field("d", &format_args!("{:#04X}", &self.d))
+         .field("e", &format_args!("{:#04X}", &self.e))
+         .field("f", &format_args!("{:#04X}", &self.f))
+         .field("h", &format_args!("{:#04X}", &self.h))
+         .field("l", &format_args!("{:#04X}", &self.l))
+         .field("interrupts_enabled", &self.interrupts_enabled)
+         .field("flags", &self.flags)
+         .finish()
+    }
+}
+
 impl CPU<'_> {
     fn tick(&mut self, maybe_metadata: Option<&ReferenceMetadata>) -> bool {
         let pc = self.pc;
@@ -115,6 +137,7 @@ impl CPU<'_> {
 
         if let Some(metadata) = maybe_metadata {
             if pc != metadata.pc {
+                println!("CPU: {:#?}", self);
                 panic!(
                     "PC({:#06X}) != reference PC ({:#06X}). Metadata: {}",
                     pc, metadata.pc, metadata.instruction
