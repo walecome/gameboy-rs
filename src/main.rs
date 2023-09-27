@@ -299,8 +299,8 @@ impl CPU<'_> {
             LoadSrcU16::ImmediateU16 => self.read_u16(),
             LoadSrcU16::StackPointer => self.sp,
             LoadSrcU16::StackPointerWithOffset => {
-                let offset = self.read_u8() as i32;
-                let signed_sp = self.sp as i32;
+                let offset = self.read_u8() as i8 as i16;
+                let signed_sp = self.sp as i16;
                 (signed_sp + offset) as u16
             }
         }
@@ -341,10 +341,9 @@ impl CPU<'_> {
     }
 
     fn relative_jump(&mut self, condition: Option<FlagCondition>) {
-        let offset = self.read_u8();
-        let signed_pc = self.pc as i32;
-        let signed_offset = offset as i32;
-        let new_pc = signed_pc + signed_offset;
+        let offset = self.read_u8() as i8 as i16;
+        let signed_pc = self.pc as i16;
+        let new_pc = signed_pc + offset;
 
         if self.is_flag_condition_true(condition) {
             self.pc = new_pc as u16;
