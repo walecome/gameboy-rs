@@ -164,20 +164,13 @@ impl CPU<'_> {
                 self.write_u16_target(dst, value);
             }
             Instruction::Call(condition) => {
-                if self.is_flag_condition_true(condition) {
-                    self.call();
-                }
+                self.call(condition);
             }
             Instruction::JumpRelative(condition) => {
-                if self.is_flag_condition_true(condition) {
-                    let offset = self.read_u8();
-                    self.relative_jump(offset);
-                }
+                self.relative_jump(condition);
             }
             Instruction::Ret(condition) => {
-                if self.is_flag_condition_true(condition) {
-                    self.ret()
-                }
+                self.ret(condition)
             }
             Instruction::Push(reg) => {
                 self.push(reg);
@@ -327,10 +320,12 @@ impl CPU<'_> {
         }
     }
 
-    fn call(&mut self) {
+    fn call(&mut self, condition: Option<FlagCondition>) {
         let target_address = self.read_u16();
         self.stack_push(self.pc);
-        self.pc = target_address;
+        if self.is_flag_condition_true(condition) {
+            self.pc = target_address;
+        }
     }
 
     fn stack_push(&mut self, value: u16) {
@@ -344,15 +339,22 @@ impl CPU<'_> {
         value
     }
 
-    fn relative_jump(&mut self, offset: u8) {
+    fn relative_jump(&mut self, condition: Option<FlagCondition>) {
+        let offset = self.read_u8();
         let signed_pc = self.pc as i32;
         let signed_offset = offset as i32;
         let new_pc = signed_pc + signed_offset;
-        self.pc = new_pc as u16;
+
+        if self.is_flag_condition_true(condition) {
+            self.pc = new_pc as u16;
+        }
     }
 
-    fn ret(&mut self) {
-        self.pc = self.stack_pop();
+    fn ret(&mut self, condition: Option<FlagCondition>) {
+        let new_pc = self.stack_pop();
+        if self.is_flag_condition_true(condition) {
+            self.pc = new_pc;
+        }
     }
 
     fn push(&mut self, reg: RegisterU16) {
