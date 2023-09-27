@@ -515,6 +515,9 @@ fn main() -> ! {
     };
     loop {
         let current_metadata = if let Some(reference_metadata) = &maybe_reference_metadata {
+            if index >= reference_metadata.len() {
+                panic!("Ran out of reference data");
+            }
             Some(&reference_metadata[index])
         } else {
             None
