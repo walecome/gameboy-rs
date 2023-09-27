@@ -406,9 +406,9 @@ impl CPU<'_> {
         self.a = self.a | value;
 
         self.flags.z = self.a == 0;
+        self.flags.n = false;
         self.flags.h = false;
         self.flags.c = false;
-        self.flags.n = false;
     }
 
     fn compare(&mut self, target: LogicalOpTarget) {
