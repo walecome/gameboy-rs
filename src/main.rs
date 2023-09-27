@@ -182,6 +182,7 @@ impl CPU<'_> {
             Instruction::IncU8(target) => self.inc_u8(target),
             Instruction::IncU16(target) => self.inc_u16(target),
             Instruction::Compare(target) => self.compare(target),
+            Instruction::And(target) => self.and(target),
         }
 
         return true;
@@ -408,6 +409,18 @@ impl CPU<'_> {
         self.flags.z = self.a == 0;
         self.flags.n = false;
         self.flags.h = false;
+        self.flags.c = false;
+    }
+
+
+    fn and(&mut self, target: LogicalOpTarget) {
+        let value = self.resolve_logical_op_target(target);
+
+        self.a = self.a & value;
+
+        self.flags.z = self.a == 0;
+        self.flags.n = false;
+        self.flags.h = true;
         self.flags.c = false;
     }
 
