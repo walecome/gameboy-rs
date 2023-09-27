@@ -99,6 +99,7 @@ pub enum Instruction {
     IncU8(IncU8Target),
     IncU16(IncU16Target),
     Or(LogicalOpTarget),
+    Compare(LogicalOpTarget),
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
@@ -316,6 +317,22 @@ fn try_decode_or_instruction(opcode: u8) -> Option<Instruction> {
     })
 }
 
+fn try_decode_compare_instruction(opcode: u8) -> Option<Instruction> {
+    Some(match opcode {
+        0xB8 => Instruction::Compare(LogicalOpTarget::Register(RegisterU8::B)),
+        0xB9 => Instruction::Compare(LogicalOpTarget::Register(RegisterU8::C)),
+        0xBA => Instruction::Compare(LogicalOpTarget::Register(RegisterU8::D)),
+        0xBB => Instruction::Compare(LogicalOpTarget::Register(RegisterU8::E)),
+        0xBC => Instruction::Compare(LogicalOpTarget::Register(RegisterU8::H)),
+        0xBD => Instruction::Compare(LogicalOpTarget::Register(RegisterU8::L)),
+        0xBE => Instruction::Compare(LogicalOpTarget::AddressHL),
+        0xBF => Instruction::Compare(LogicalOpTarget::Register(RegisterU8::A)),
+
+        0xFE => Instruction::Compare(LogicalOpTarget::ImmediateU8),
+        _ => return None,
+    })
+}
+
 // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 pub fn decode(opcode: u8) -> Option<Instruction> {
     if let Some(instruction) = try_decode_u8_load_instruction(opcode) {
@@ -351,6 +368,10 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
     }
 
     if let Some(instruction) = try_decode_or_instruction(opcode) {
+        return Some(instruction);
+    }
+
+    if let Some(instruction) = try_decode_compare_instruction(opcode) {
         return Some(instruction);
     }
 

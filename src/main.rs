@@ -181,6 +181,7 @@ impl CPU<'_> {
             },
             Instruction::IncU8(target) => self.inc_u8(target),
             Instruction::IncU16(target) => self.inc_u16(target),
+            Instruction::Compare(target) => self.compare(target),
         }
 
         return true;
@@ -400,14 +401,7 @@ impl CPU<'_> {
     }
 
     fn or(&mut self, target: LogicalOpTarget) {
-        let value = match target {
-            LogicalOpTarget::Register(reg) => *self.resolve_u8_reg(reg),
-            LogicalOpTarget::AddressHL => {
-                let address = self.resolve_u16_reg(&RegisterU16::HL).get();
-                self.memory.get(address)
-            }
-            LogicalOpTarget::ImmediateU8 => self.read_u8(),
-        };
+        let value = self.resolve_logical_op_target(target);
 
         self.a = self.a | value;
 
@@ -415,6 +409,31 @@ impl CPU<'_> {
         self.flags.h = false;
         self.flags.c = false;
         self.flags.n = false;
+    }
+
+    fn compare(&mut self, target: LogicalOpTarget) {
+        let value = self.resolve_logical_op_target(target);
+
+        let result = self.a.wrapping_sub(value);
+
+        let nibble_a = self.a & 0xF;
+        let nibble_value = self.a & 0xF;
+
+        self.flags.z = result == 0;
+        self.flags.n = true;
+        self.flags.h = nibble_a < nibble_value;
+        self.flags.c = self.a < value;
+    }
+
+    fn resolve_logical_op_target(&mut self, target: LogicalOpTarget) -> u8 {
+        match target {
+            LogicalOpTarget::Register(reg) => *self.resolve_u8_reg(reg),
+            LogicalOpTarget::AddressHL => {
+                let address = self.resolve_u16_reg(&RegisterU16::HL).get();
+                self.memory.get(address)
+            }
+            LogicalOpTarget::ImmediateU8 => self.read_u8(),
+        }
     }
 
     fn is_flag_condition_true(&self, condition: Option<FlagCondition>) -> bool {
