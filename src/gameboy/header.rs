@@ -159,6 +159,7 @@ impl RomSize {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 enum RamSize {
     NoBanks,
     Size {
@@ -180,6 +181,7 @@ impl RamSize {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Header {
     title: String,
     manufacturer_code: Option<String>,
