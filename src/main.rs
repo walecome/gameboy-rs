@@ -185,6 +185,7 @@ impl CPU<'_> {
             Instruction::And(target) => self.and(target),
             Instruction::DecU8(target) => self.dec_u8(target),
             Instruction::DecU16(target) => self.dec_u16(target),
+            Instruction::Xor(target) => self.xor(target),
         }
 
         return true;
@@ -456,6 +457,17 @@ impl CPU<'_> {
         self.flags.z = self.a == 0;
         self.flags.n = false;
         self.flags.h = true;
+        self.flags.c = false;
+    }
+
+    fn xor(&mut self, target: LogicalOpTarget) {
+        let value = self.resolve_logical_op_target(target);
+
+        self.a = self.a ^ value;
+
+        self.flags.z = self.a == 0;
+        self.flags.n = false;
+        self.flags.h = false;
         self.flags.c = false;
     }
 
