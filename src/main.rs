@@ -7,7 +7,7 @@ use clap::Parser;
 use gameboy::header::Header;
 use gameboy::instruction_decoder::{
     decode, Instruction, LoadDstU16, LoadDstU8, LoadSrcU16, LoadSrcU8, RegisterU16,
-    RegisterU8, LogicalOpTarget, FlagCondition, IncU8Target, IncU16Target,
+    RegisterU8, LogicalOpTarget, FlagCondition, IncDecU8Target, IncDecU16Target,
 };
 
 #[derive(Parser)]
@@ -183,6 +183,8 @@ impl CPU<'_> {
             Instruction::IncU16(target) => self.inc_u16(target),
             Instruction::Compare(target) => self.compare(target),
             Instruction::And(target) => self.and(target),
+            Instruction::DecU8(target) => self.dec_u8(target),
+            Instruction::DecU16(target) => self.dec_u16(target),
         }
 
         return true;
@@ -368,14 +370,14 @@ impl CPU<'_> {
         self.resolve_u16_reg(&reg).set(value);
     }
 
-    fn inc_u8(&mut self, target: IncU8Target) {
+    fn inc_u8(&mut self, target: IncDecU8Target) {
         let result = match target {
-            IncU8Target::RegisterU8(reg) => {
+            IncDecU8Target::RegisterU8(reg) => {
                 let current = self.resolve_u8_reg(reg);
                 *current = current.wrapping_add(1);
                 *current
             }
-            IncU8Target::Address(reg) => {
+            IncDecU8Target::Address(reg) => {
                 let address = self.resolve_u16_reg(&reg).get();
                 let value = self.memory.get(address).wrapping_add(1);
                 self.memory.set(address, value);
@@ -388,14 +390,47 @@ impl CPU<'_> {
         self.flags.h = (result & 0x0F) == 0x00;
     }
 
-    fn inc_u16(&mut self, target: IncU16Target) {
+    fn inc_u16(&mut self, target: IncDecU16Target) {
         match target {
-            IncU16Target::RegisterU16(reg) => {
+            IncDecU16Target::RegisterU16(reg) => {
                 let current = self.resolve_u16_reg(&reg).get();
                 let value = current.wrapping_add(1);
                 self.resolve_u16_reg(&reg).set(value);
             }
-            IncU16Target::StackPointer => {
+            IncDecU16Target::StackPointer => {
+                self.sp += 1;
+            }
+        };
+    }
+
+    fn dec_u8(&mut self, target: IncDecU8Target) {
+        let result = match target {
+            IncDecU8Target::RegisterU8(reg) => {
+                let current = self.resolve_u8_reg(reg);
+                *current = current.wrapping_sub(1);
+                *current
+            }
+            IncDecU8Target::Address(reg) => {
+                let address = self.resolve_u16_reg(&reg).get();
+                let value = self.memory.get(address).wrapping_sub(1);
+                self.memory.set(address, value);
+                value
+            }
+        };
+
+        self.flags.z = result == 0;
+        self.flags.n = true;
+        self.flags.h = (result & 0x0F) == 0x0F;
+    }
+
+    fn dec_u16(&mut self, target: IncDecU16Target) {
+        match target {
+            IncDecU16Target::RegisterU16(reg) => {
+                let current = self.resolve_u16_reg(&reg).get();
+                let value = current.wrapping_add(1);
+                self.resolve_u16_reg(&reg).set(value);
+            }
+            IncDecU16Target::StackPointer => {
                 self.sp += 1;
             }
         };

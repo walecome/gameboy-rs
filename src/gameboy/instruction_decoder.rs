@@ -65,13 +65,13 @@ pub enum FlagCondition {
 }
 
 #[derive(Debug)]
-pub enum IncU8Target {
+pub enum IncDecU8Target {
     RegisterU8(RegisterU8),
     Address(RegisterU16),
 }
 
 #[derive(Debug)]
-pub enum IncU16Target {
+pub enum IncDecU16Target {
     RegisterU16(RegisterU16),
     StackPointer,
 }
@@ -96,11 +96,13 @@ pub enum Instruction {
     Ret(Option<FlagCondition>),
     Push(RegisterU16),
     Pop(RegisterU16),
-    IncU8(IncU8Target),
-    IncU16(IncU16Target),
+    IncU8(IncDecU8Target),
+    IncU16(IncDecU16Target),
     Or(LogicalOpTarget),
     Compare(LogicalOpTarget),
     And(LogicalOpTarget),
+    DecU8(IncDecU8Target),
+    DecU16(IncDecU16Target),
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
@@ -285,19 +287,20 @@ fn try_decode_pop_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_inc_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0x03 => Instruction::IncU16(IncU16Target::RegisterU16(RegisterU16::BC)),
-        0x13 => Instruction::IncU16(IncU16Target::RegisterU16(RegisterU16::DE)),
-        0x23 => Instruction::IncU16(IncU16Target::RegisterU16(RegisterU16::HL)),
-        0x33 => Instruction::IncU16(IncU16Target::StackPointer),
+        0x03 => Instruction::IncU16(IncDecU16Target::RegisterU16(RegisterU16::BC)),
+        0x13 => Instruction::IncU16(IncDecU16Target::RegisterU16(RegisterU16::DE)),
+        0x23 => Instruction::IncU16(IncDecU16Target::RegisterU16(RegisterU16::HL)),
+        0x33 => Instruction::IncU16(IncDecU16Target::StackPointer),
 
-        0x04 => Instruction::IncU8(IncU8Target::RegisterU8(RegisterU8::B)),
-        0x0C => Instruction::IncU8(IncU8Target::RegisterU8(RegisterU8::C)),
-        0x14 => Instruction::IncU8(IncU8Target::RegisterU8(RegisterU8::D)),
-        0x1C => Instruction::IncU8(IncU8Target::RegisterU8(RegisterU8::E)),
-        0x24 => Instruction::IncU8(IncU8Target::RegisterU8(RegisterU8::H)),
-        0x2C => Instruction::IncU8(IncU8Target::RegisterU8(RegisterU8::L)),
-        0x34 => Instruction::IncU8(IncU8Target::Address(RegisterU16::HL)),
-        0x3C => Instruction::IncU8(IncU8Target::RegisterU8(RegisterU8::A)),
+        0x04 => Instruction::IncU8(IncDecU8Target::RegisterU8(RegisterU8::B)),
+        0x14 => Instruction::IncU8(IncDecU8Target::RegisterU8(RegisterU8::D)),
+        0x24 => Instruction::IncU8(IncDecU8Target::RegisterU8(RegisterU8::H)),
+        0x34 => Instruction::IncU8(IncDecU8Target::Address(RegisterU16::HL)),
+
+        0x0C => Instruction::IncU8(IncDecU8Target::RegisterU8(RegisterU8::C)),
+        0x1C => Instruction::IncU8(IncDecU8Target::RegisterU8(RegisterU8::E)),
+        0x2C => Instruction::IncU8(IncDecU8Target::RegisterU8(RegisterU8::L)),
+        0x3C => Instruction::IncU8(IncDecU8Target::RegisterU8(RegisterU8::A)),
         _ => return None,
     })
 }
@@ -350,6 +353,26 @@ fn try_decode_and_instruction(opcode: u8) -> Option<Instruction> {
     })
 }
 
+fn try_decode_dec_instruction(opcode: u8) -> Option<Instruction> {
+    Some(match opcode {
+        0x0B => Instruction::DecU16(IncDecU16Target::RegisterU16(RegisterU16::BC)),
+        0x1B => Instruction::DecU16(IncDecU16Target::RegisterU16(RegisterU16::DE)),
+        0x2B => Instruction::DecU16(IncDecU16Target::RegisterU16(RegisterU16::HL)),
+        0x3B => Instruction::DecU16(IncDecU16Target::StackPointer),
+
+        0x05 => Instruction::DecU8(IncDecU8Target::RegisterU8(RegisterU8::B)),
+        0x15 => Instruction::DecU8(IncDecU8Target::RegisterU8(RegisterU8::D)),
+        0x25 => Instruction::DecU8(IncDecU8Target::RegisterU8(RegisterU8::H)),
+        0x35 => Instruction::DecU8(IncDecU8Target::Address(RegisterU16::HL)),
+
+        0x0D => Instruction::DecU8(IncDecU8Target::RegisterU8(RegisterU8::C)),
+        0x1D => Instruction::DecU8(IncDecU8Target::RegisterU8(RegisterU8::E)),
+        0x2D => Instruction::DecU8(IncDecU8Target::RegisterU8(RegisterU8::L)),
+        0x3D => Instruction::DecU8(IncDecU8Target::RegisterU8(RegisterU8::A)),
+        _ => return None,
+    })
+}
+
 // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 pub fn decode(opcode: u8) -> Option<Instruction> {
     if let Some(instruction) = try_decode_u8_load_instruction(opcode) {
@@ -393,6 +416,10 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
     }
 
     if let Some(instruction) = try_decode_and_instruction(opcode) {
+        return Some(instruction);
+    }
+
+    if let Some(instruction) = try_decode_dec_instruction(opcode) {
         return Some(instruction);
     }
 
