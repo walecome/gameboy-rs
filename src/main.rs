@@ -502,6 +502,8 @@ impl CPU<'_> {
         let hl = self.resolve_u16_reg(&RegisterU16::HL).get();
         let result = (hl as u32) + (rhs as u32);
 
+        self.resolve_u16_reg(&RegisterU16::HL).set(result as u16);
+
         self.flags.n = false;
         self.flags.h = (hl & 0xFFF) + (rhs & 0xFFF) > 0xFFF;
         self.flags.c = result > 0xFFFF;
