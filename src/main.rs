@@ -432,11 +432,11 @@ impl CPU<'_> {
         match target {
             U16Target::RegisterU16(reg) => {
                 let current = self.resolve_u16_reg(&reg).get();
-                let value = current.wrapping_add(1);
+                let value = current.wrapping_sub(1);
                 self.resolve_u16_reg(&reg).set(value);
             }
             U16Target::StackPointer => {
-                self.sp += 1;
+                self.sp -= 1;
             }
         };
     }
