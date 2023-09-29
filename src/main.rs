@@ -128,7 +128,7 @@ impl fmt::Debug for CPU<'_> {
 }
 
 impl CPU<'_> {
-    fn tick(&mut self, maybe_metadata: Option<&ReferenceMetadata>) -> bool {
+    fn tick(&mut self, maybe_metadata: Option<&ReferenceMetadata>, i: usize) -> bool {
         let pc = self.pc;
         let opcode = self.read_u8();
         let instruction =
@@ -137,7 +137,7 @@ impl CPU<'_> {
 
         if let Some(metadata) = maybe_metadata {
             if pc != metadata.pc {
-                println!("CPU: {:#?}", self);
+                println!("CPU (tick {}): {:#?}", i, self);
                 panic!(
                     "PC({:#06X}) != reference PC ({:#06X}). Metadata: {}",
                     pc, metadata.pc, metadata.instruction
@@ -646,7 +646,7 @@ fn main() -> ! {
         } else {
             None
         };
-        cpu.tick(current_metadata);
+        cpu.tick(current_metadata, index);
         index += 1;
     }
 }
