@@ -331,8 +331,8 @@ impl CPU<'_> {
 
     fn call(&mut self, condition: Option<FlagCondition>) {
         let target_address = self.read_u16();
-        self.stack_push(self.pc);
         if self.is_flag_condition_true(condition) {
+            self.stack_push(self.pc);
             self.pc = target_address;
         }
     }
@@ -359,8 +359,8 @@ impl CPU<'_> {
     }
 
     fn ret(&mut self, condition: Option<FlagCondition>) {
-        let new_pc = self.stack_pop();
         if self.is_flag_condition_true(condition) {
+            let new_pc = self.stack_pop();
             self.pc = new_pc;
         }
     }
