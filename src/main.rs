@@ -104,6 +104,9 @@ struct CPU<'a> {
     l: u8,
     interrupts_enabled: bool,
     flags: Flags,
+
+    // Debug
+    depth: usize,
 }
 
 impl fmt::Debug for CPU<'_> {
@@ -133,6 +136,7 @@ impl CPU<'_> {
         let opcode = self.read_u8();
         let instruction =
             decode(opcode).expect(format!("Unknown opcode: {:#06X}: {:#04X}", pc, opcode).as_str());
+        print!("{:.<1$}", "", 1 * self.depth);
         println!("{:#06X}: {:#04X} ({:?})", pc, opcode, instruction);
 
         if let Some(metadata) = maybe_metadata {
@@ -165,12 +169,14 @@ impl CPU<'_> {
             }
             Instruction::Call(condition) => {
                 self.call(condition);
+                self.depth += 1;
             }
             Instruction::JumpRelative(condition) => {
                 self.relative_jump(condition);
             }
             Instruction::Ret(condition) => {
-                self.ret(condition)
+                self.depth -= 1;
+                self.ret(condition);
             }
             Instruction::Push(reg) => {
                 self.push(reg);
@@ -640,6 +646,7 @@ fn main() -> ! {
         l: 0x00,
         interrupts_enabled: false,
         flags: Flags { z: false, n: false, h: false, c: false },
+        depth: 0,
     };
     loop {
         let current_metadata = if let Some(reference_metadata) = &maybe_reference_metadata {
