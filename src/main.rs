@@ -188,7 +188,8 @@ impl CPU<'_> {
             Instruction::Xor(target) => self.xor(target),
             Instruction::AddStackPointer => self.add_stackpointer_immediate(),
             Instruction::AddU8(target) => self.add_u8(target),
-            Instruction::AddU16(target) => self.add_u16(target)
+            Instruction::AddU16(target) => self.add_u16(target),
+            Instruction::Sub(target) => self.sub(target),
         }
 
         return true;
@@ -504,6 +505,20 @@ impl CPU<'_> {
         self.flags.n = false;
         self.flags.h = (hl & 0xFFF) + (rhs & 0xFFF) > 0xFFF;
         self.flags.c = result > 0xFFFF;
+    }
+
+    fn sub(&mut self, target: LogicalOpTarget) {
+        let value = self.resolve_logical_op_target(target);
+
+        let half_carry = (self.a & 0xF) < (value & 0xF);
+        let carry = self.a < value;
+
+        self.a = self.a.wrapping_sub(value);
+
+        self.flags.z = self.a == 0;
+        self.flags.n = true;
+        self.flags.h = half_carry;
+        self.flags.c = carry;
     }
 
     fn add_stackpointer_immediate(&mut self) {

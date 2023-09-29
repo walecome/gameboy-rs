@@ -107,6 +107,7 @@ pub enum Instruction {
     AddStackPointer,
     AddU8(LogicalOpTarget),
     AddU16(U16Target),
+    Sub(LogicalOpTarget),
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
@@ -418,6 +419,23 @@ fn try_decode_add_instruction(opcode: u8) -> Option<Instruction> {
     })
 }
 
+fn try_decode_sub_instruction(opcode: u8) -> Option<Instruction> {
+    Some(match opcode {
+        0x90 => Instruction::Sub(LogicalOpTarget::Register(RegisterU8::B)),
+        0x91 => Instruction::Sub(LogicalOpTarget::Register(RegisterU8::C)),
+        0x92 => Instruction::Sub(LogicalOpTarget::Register(RegisterU8::D)),
+        0x93 => Instruction::Sub(LogicalOpTarget::Register(RegisterU8::E)),
+        0x94 => Instruction::Sub(LogicalOpTarget::Register(RegisterU8::H)),
+        0x95 => Instruction::Sub(LogicalOpTarget::Register(RegisterU8::L)),
+        0x96 => Instruction::Sub(LogicalOpTarget::AddressHL),
+        0x97 => Instruction::Sub(LogicalOpTarget::Register(RegisterU8::A)),
+
+        0xD6 => Instruction::Sub(LogicalOpTarget::ImmediateU8),
+        _ => return None,
+    })
+}
+
+
 // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 pub fn decode(opcode: u8) -> Option<Instruction> {
     if let Some(instruction) = try_decode_u8_load_instruction(opcode) {
@@ -473,6 +491,10 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
     }
 
     if let Some(instruction) = try_decode_add_instruction(opcode) {
+        return Some(instruction);
+    }
+
+    if let Some(instruction) = try_decode_sub_instruction(opcode) {
         return Some(instruction);
     }
 
