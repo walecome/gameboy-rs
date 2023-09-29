@@ -526,6 +526,8 @@ impl CPU<'_> {
         let signed_sp = self.sp as i16;
         let result = signed_sp + offset;
 
+        self.sp = result as u16;
+
         let signed_mask = 0xFFFF as u16 as i16;
 
         self.flags.z = false;
