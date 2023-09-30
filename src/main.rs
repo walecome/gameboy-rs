@@ -1,13 +1,13 @@
 mod gameboy;
 
-use std::{fs, fmt, path::PathBuf};
+use std::{fmt, fs, path::PathBuf};
 
 use clap::Parser;
 
 use gameboy::header::Header;
 use gameboy::instruction_decoder::{
-    decode, Instruction, LoadDstU16, LoadDstU8, LoadSrcU16, LoadSrcU8, RegisterU16,
-    RegisterU8, LogicalOpTarget, FlagCondition, IncDecU8Target, U16Target,
+    decode, FlagCondition, IncDecU8Target, Instruction, LoadDstU16, LoadDstU8, LoadSrcU16,
+    LoadSrcU8, LogicalOpTarget, RegisterU16, RegisterU8, U16Target,
 };
 
 #[derive(Parser)]
@@ -24,31 +24,40 @@ struct Memory {
 
 impl Memory {
     fn get(&self, address: u16) -> u8 {
-        self.data[address as usize]
+        let value = self.data[address as usize];
+        println!("mem[{:#06X}] -> {:#04X}", address, value);
+        value
     }
 
     fn get_from_u8(&self, lower_address: u8) -> u8 {
         let address = 0xFF00 + (lower_address as u16);
-        self.data[(address) as usize]
+        let value = self.data[(address) as usize];
+        println!("mem[{:#06X}] -> {:#04X}", address, value);
+        value
     }
 
     fn get_u16(&self, address: u16) -> u16 {
         let low = self.data[address as usize];
         let high = self.data[(address + 1) as usize];
-        return ((high as u16) << 8) | (low as u16);
+        let value = ((high as u16) << 8) | (low as u16);
+        println!("mem[{:#06X}] -> {:#06X}", address, value);
+        value
     }
 
     fn set(&mut self, address: u16, value: u8) {
         // TODO: Handle memory map
-        self.set_internal(address as usize, value)
+        self.set_internal(address as usize, value);
+        println!("mem[{:#06X}]={:#04X}", address, value);
     }
 
     fn set_from_u8(&mut self, lower_address: u8, value: u8) {
         let address = 0xFF00 + (lower_address as u16);
         self.set_internal(address as usize, value);
+        println!("mem[{:#06X}]={:#04X}", address, value);
     }
 
     fn set_u16(&mut self, address: u16, value: u16) {
+        println!("mem[{:#06X}]={:#06X}", address, value);
         let low = (value & 0x00FF) as u8;
         let high = ((value & 0xFF00) >> 8) as u8;
         self.set_internal(address as usize, low);
@@ -112,21 +121,60 @@ struct CPU<'a> {
 impl fmt::Debug for CPU<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("CPU")
-         .field("rom_data", &"<omitted>".to_owned())
-         .field("pc", &format_args!("{:#06X}", &self.pc))
-         .field("sp", &format_args!("{:#06X}", &self.sp))
-         .field("memory", &"<omitted>".to_owned())
-         .field("a", &format_args!("{:#04X}", &self.a))
-         .field("b", &format_args!("{:#04X}", &self.b))
-         .field("c", &format_args!("{:#04X}", &self.c))
-         .field("d", &format_args!("{:#04X}", &self.d))
-         .field("e", &format_args!("{:#04X}", &self.e))
-         .field("f", &format_args!("{:#04X}", &self.f))
-         .field("h", &format_args!("{:#04X}", &self.h))
-         .field("l", &format_args!("{:#04X}", &self.l))
-         .field("interrupts_enabled", &self.interrupts_enabled)
-         .field("flags", &self.flags)
-         .finish()
+            .field("rom_data", &"<omitted>".to_owned())
+            .field("pc", &format_args!("{:#06X}", &self.pc))
+            .field("sp", &format_args!("{:#06X}", &self.sp))
+            .field("memory", &"<omitted>".to_owned())
+            .field("a", &format_args!("{:#04X}", &self.a))
+            .field("b", &format_args!("{:#04X}", &self.b))
+            .field("c", &format_args!("{:#04X}", &self.c))
+            .field("d", &format_args!("{:#04X}", &self.d))
+            .field("e", &format_args!("{:#04X}", &self.e))
+            .field("f", &format_args!("{:#04X}", &self.f))
+            .field("h", &format_args!("{:#04X}", &self.h))
+            .field("l", &format_args!("{:#04X}", &self.l))
+            .field("interrupts_enabled", &self.interrupts_enabled)
+            .field("flags", &self.flags)
+            .finish()
+    }
+}
+
+fn verify_state(
+    cpu: &CPU,
+    maybe_metadata: Option<&ReferenceMetadata>,
+    i: usize,
+    pc: u16,
+    opcode: u8,
+) {
+    if maybe_metadata.is_none() {
+        return
+    }
+    let metadata = maybe_metadata.unwrap();
+
+    let maybe_error_message = if pc != metadata.pc {
+        Some(format!(
+            "PC({:#06X}) != reference PC ({:#06X}). Metadata: {}",
+            pc, metadata.pc, metadata.instruction
+        ))
+    } else {
+        match metadata.opcode {
+            ReferenceOpcode::Plain(reference_opcode) => {
+                if opcode != reference_opcode {
+                    Some(format!(
+                        "opcode({:#04X}) != reference opcode ({:#04X}). Metadata: {}",
+                        opcode, reference_opcode, metadata.instruction
+                    ))
+                } else {
+                    None
+                }
+            }
+            ReferenceOpcode::CB(_) => todo!(),
+        }
+    };
+
+    if let Some(message) = maybe_error_message {
+        println!("CPU (tick {}): {:#?}", i, cpu);
+        panic!("{}", message);
     }
 }
 
@@ -134,20 +182,15 @@ impl CPU<'_> {
     fn tick(&mut self, maybe_metadata: Option<&ReferenceMetadata>, i: usize) -> bool {
         let pc = self.pc;
         let opcode = self.read_u8();
+        if opcode == 0xCB {
+            todo!("Implement CB instructions");
+        }
         let instruction =
             decode(opcode).expect(format!("Unknown opcode: {:#06X}: {:#04X}", pc, opcode).as_str());
         print!("{:.<1$}", "", 1 * self.depth);
         println!("{:#06X}: {:#04X} ({:?})", pc, opcode, instruction);
 
-        if let Some(metadata) = maybe_metadata {
-            if pc != metadata.pc {
-                println!("CPU (tick {}): {:#?}", i, self);
-                panic!(
-                    "PC({:#06X}) != reference PC ({:#06X}). Metadata: {}",
-                    pc, metadata.pc, metadata.instruction
-                );
-            }
-        }
+        verify_state(self, maybe_metadata, i, pc, opcode);
 
         match instruction {
             Instruction::Noop => {}
@@ -184,7 +227,7 @@ impl CPU<'_> {
             Instruction::Pop(reg) => self.pop(reg),
             Instruction::Or(target) => {
                 self.or(target);
-            },
+            }
             Instruction::IncU8(target) => self.inc_u8(target),
             Instruction::IncU16(target) => self.inc_u16(target),
             Instruction::Compare(target) => self.compare(target),
@@ -458,7 +501,6 @@ impl CPU<'_> {
         self.flags.c = false;
     }
 
-
     fn and(&mut self, target: LogicalOpTarget) {
         let value = self.resolve_logical_op_target(target);
 
@@ -498,12 +540,8 @@ impl CPU<'_> {
 
     fn add_u16(&mut self, target: U16Target) {
         let rhs = match target {
-            U16Target::RegisterU16(reg) => {
-                self.resolve_u16_reg(&reg).get()
-            },
-            U16Target::StackPointer => {
-                self.sp
-            }
+            U16Target::RegisterU16(reg) => self.resolve_u16_reg(&reg).get(),
+            U16Target::StackPointer => self.sp,
         };
         let hl = self.resolve_u16_reg(&RegisterU16::HL).get();
         let result = (hl as u32) + (rhs as u32);
@@ -581,12 +619,37 @@ impl CPU<'_> {
             FlagCondition::NC => !self.flags.c,
         }
     }
+}
 
+enum ReferenceOpcode {
+    Plain(u8),
+    CB(u8),
 }
 
 struct ReferenceMetadata {
     pc: u16,
     instruction: String,
+    opcode: ReferenceOpcode,
+}
+
+fn read_opcode(part: &str) -> ReferenceOpcode {
+    let mut tmp = part.rsplit_once("(").unwrap().1.to_owned();
+    tmp.pop();
+    let (raw, is_cb) = if tmp.starts_with("CB") {
+        (
+            tmp.strip_prefix("CB ").unwrap().strip_prefix("0x").unwrap(),
+            true,
+        )
+    } else {
+        (tmp.strip_prefix("0x").unwrap(), false)
+    };
+    let value =
+        u8::from_str_radix(raw, 16).expect(format!("Could not make '{}' to hex", raw).as_str());
+    return if is_cb {
+        ReferenceOpcode::CB(value)
+    } else {
+        ReferenceOpcode::Plain(value)
+    };
 }
 
 fn get_reference_metadata(reference: &PathBuf) -> Vec<ReferenceMetadata> {
@@ -609,6 +672,7 @@ fn get_reference_metadata(reference: &PathBuf) -> Vec<ReferenceMetadata> {
             ReferenceMetadata {
                 pc: pc.unwrap(),
                 instruction,
+                opcode: read_opcode(line),
             }
         })
         .collect()
@@ -617,11 +681,12 @@ fn get_reference_metadata(reference: &PathBuf) -> Vec<ReferenceMetadata> {
 fn main() -> ! {
     let args = Args::parse();
 
-    let maybe_reference_metadata: Option<Vec<ReferenceMetadata>> = if let Some(reference) = args.reference {
-        Some(get_reference_metadata(&reference))
-    } else {
-        None
-    };
+    let maybe_reference_metadata: Option<Vec<ReferenceMetadata>> =
+        if let Some(reference) = args.reference {
+            Some(get_reference_metadata(&reference))
+        } else {
+            None
+        };
 
     let rom_data = fs::read(args.rom).unwrap();
     let header = Header::read_from_rom(&rom_data).unwrap();
@@ -645,7 +710,12 @@ fn main() -> ! {
         h: 0x00,
         l: 0x00,
         interrupts_enabled: false,
-        flags: Flags { z: false, n: false, h: false, c: false },
+        flags: Flags {
+            z: false,
+            n: false,
+            h: false,
+            c: false,
+        },
         depth: 0,
     };
     loop {
