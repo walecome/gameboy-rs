@@ -5,6 +5,8 @@ pub enum RegisterU8 {
     C,
     D,
     E,
+    // F is not used outside AF
+    #[allow(dead_code)]
     F,
     H,
     L,
