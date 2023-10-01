@@ -5,7 +5,7 @@ use super::instruction_decoder::{
     LoadSrcU8, LogicalOpTarget, RegisterU16, RegisterU8, U16Target,
 };
 
-use super::memory::Memory;
+use super::mmu::{MMU, Address, Word};
 
 use super::reference::{ReferenceMetadata, ReferenceOpcode};
 
@@ -53,7 +53,7 @@ pub struct CPU<'a> {
     rom_data: &'a Vec<u8>,
     pc: u16,
     sp: u16,
-    memory: Memory,
+    mmu: MMU,
     a: u8,
     b: u8,
     c: u8,
@@ -75,7 +75,7 @@ impl fmt::Debug for CPU<'_> {
             .field("rom_data", &"<omitted>".to_owned())
             .field("pc", &format_args!("{:#06X}", &self.pc))
             .field("sp", &format_args!("{:#06X}", &self.sp))
-            .field("memory", &"<omitted>".to_owned())
+            .field("mmu", &"<omitted>".to_owned())
             .field("a", &format_args!("{:#04X}", &self.a))
             .field("b", &format_args!("{:#04X}", &self.b))
             .field("c", &format_args!("{:#04X}", &self.c))
@@ -135,7 +135,7 @@ impl CPU<'_> {
             rom_data: &rom_data,
             pc: 0x0100,
             sp: 0x0FFFE,
-            memory: Memory::new(),
+            mmu: MMU::new(),
             a: 0x00,
             b: 0x00,
             c: 0x00,
@@ -249,31 +249,33 @@ impl CPU<'_> {
         match target {
             LoadSrcU8::Register(reg) => *self.resolve_u8_reg(reg),
             LoadSrcU8::AddressU16(reg) => {
-                let address = self.resolve_u16_reg(&reg).get();
-                self.memory.get(address)
+                let addr = self.resolve_u16_reg(&reg).get();
+                self.mmu.read(Address::new(addr))
             }
             LoadSrcU8::AddressU8(reg) => {
-                let lower_address = *self.resolve_u8_reg(reg);
-                self.memory.get_from_u8(lower_address)
+                let lower_addr = *self.resolve_u8_reg(reg);
+                self.mmu.read(Address::from_lower(lower_addr))
             }
             LoadSrcU8::ImmediateAddressU8 => {
-                let lower_address = self.read_u8();
-                self.memory.get_from_u8(lower_address)
+                let lower_addr = self.read_u8();
+                self.mmu.read(Address::from_lower(lower_addr))
             }
             LoadSrcU8::ImmediateAddressU16 => {
-                let address = self.read_u16();
-                self.memory.get(address)
+                let addr = self.read_u16();
+                self.mmu.read(Address::new(addr))
             }
             LoadSrcU8::ImmediateU8 => self.read_u8(),
             LoadSrcU8::AddressU16Increment(reg) => {
-                let address = self.resolve_u16_reg(&reg).get();
-                self.resolve_u16_reg(&reg).set(address + 1);
-                self.memory.get(address)
+                let addr = self.resolve_u16_reg(&reg).get();
+                let value = self.mmu.read(Address::new(addr));
+                self.resolve_u16_reg(&reg).set(addr + 1);
+                value
             }
             LoadSrcU8::AddressU16Decrement(reg) => {
-                let address = self.resolve_u16_reg(&reg).get();
-                self.resolve_u16_reg(&reg).set(address - 1);
-                self.memory.get(address)
+                let addr = self.resolve_u16_reg(&reg).get();
+                let value = self.mmu.read(Address::new(addr));
+                self.resolve_u16_reg(&reg).set(addr - 1);
+                value
             }
         }
     }
@@ -284,30 +286,30 @@ impl CPU<'_> {
                 *self.resolve_u8_reg(reg) = value;
             }
             LoadDstU8::AddressU8(reg) => {
-                let lower_address = *self.resolve_u8_reg(reg);
-                self.memory.set_from_u8(lower_address, value);
+                let lower_addr = *self.resolve_u8_reg(reg);
+                self.mmu.write(Address::from_lower(lower_addr), value);
             }
             LoadDstU8::AddressU16(reg) => {
-                let address = self.resolve_u16_reg(&reg).get();
-                self.memory.set(address, value);
+                let addr = self.resolve_u16_reg(&reg).get();
+                self.mmu.write(Address::new(addr), value)
             }
             LoadDstU8::AddressU16Increment(reg) => {
-                let address = self.resolve_u16_reg(&reg).get();
-                self.resolve_u16_reg(&reg).set(address + 1);
-                self.memory.set(address, value);
+                let addr = self.resolve_u16_reg(&reg).get();
+                self.mmu.write(Address::new(addr), value);
+                self.resolve_u16_reg(&reg).set(addr + 1);
             }
             LoadDstU8::AddressU16Decrement(reg) => {
-                let address = self.resolve_u16_reg(&reg).get();
-                self.resolve_u16_reg(&reg).set(address - 1);
-                self.memory.set(address, value);
+                let addr = self.resolve_u16_reg(&reg).get();
+                self.mmu.write(Address::new(addr), value);
+                self.resolve_u16_reg(&reg).set(addr - 1);
             }
             LoadDstU8::ImmediateAddressU8 => {
-                let lower_address = self.read_u8();
-                self.memory.set_from_u8(lower_address, value);
+                let lower_addr = self.read_u8();
+                self.mmu.write(Address::from_lower(lower_addr), value);
             }
             LoadDstU8::ImmediateAddressU16 => {
-                let address = self.read_u16();
-                self.memory.set(address, value);
+                let addr = self.read_u16();
+                self.mmu.write(Address::new(addr), value);
             }
         }
     }
@@ -334,8 +336,8 @@ impl CPU<'_> {
                 self.sp = value;
             }
             LoadDstU16::ImmediateAddress => {
-                let address = self.read_u16();
-                self.memory.set_u16(address, value);
+                let addr = self.read_u16();
+                self.mmu.write_word(Address::new(addr), Word::new(value));
             }
         }
     }
@@ -350,13 +352,13 @@ impl CPU<'_> {
 
     fn stack_push(&mut self, value: u16) {
         self.sp -= 2;
-        self.memory.set_u16(self.sp, value);
+        self.mmu.write_word(Address::new(self.sp), Word::new(value));
     }
 
     fn stack_pop(&mut self) -> u16 {
-        let value = self.memory.get_u16(self.sp);
+        let word = self.mmu.read_word(Address::new(self.sp));
         self.sp += 2;
-        value
+        word.value
     }
 
     fn relative_jump(&mut self, condition: Option<FlagCondition>) {
@@ -394,9 +396,9 @@ impl CPU<'_> {
                 *current
             }
             IncDecU8Target::Address(reg) => {
-                let address = self.resolve_u16_reg(&reg).get();
-                let value = self.memory.get(address).wrapping_add(1);
-                self.memory.set(address, value);
+                let address = Address::new(self.resolve_u16_reg(&reg).get());
+                let value = self.mmu.read(address).wrapping_add(1);
+                self.mmu.write(address, value);
                 value
             }
         };
@@ -427,9 +429,9 @@ impl CPU<'_> {
                 *current
             }
             IncDecU8Target::Address(reg) => {
-                let address = self.resolve_u16_reg(&reg).get();
-                let value = self.memory.get(address).wrapping_sub(1);
-                self.memory.set(address, value);
+                let address = Address::new(self.resolve_u16_reg(&reg).get());
+                let value = self.mmu.read(address).wrapping_sub(1);
+                self.mmu.write(address, value);
                 value
             }
         };
@@ -562,8 +564,8 @@ impl CPU<'_> {
         match target {
             LogicalOpTarget::Register(reg) => *self.resolve_u8_reg(reg),
             LogicalOpTarget::AddressHL => {
-                let address = self.resolve_u16_reg(&RegisterU16::HL).get();
-                self.memory.get(address)
+                let addr = self.resolve_u16_reg(&RegisterU16::HL).get();
+                self.mmu.read(Address::new(addr))
             }
             LogicalOpTarget::ImmediateU8 => self.read_u8(),
         }
