@@ -112,21 +112,22 @@ impl IO {
             _ => panic!("Trying to write IO outside mapped area: {:#06X}", address.addr),
         };
 
-        let target: &mut u8 = match select_byte {
-            0x00 => &mut self.joypad_input,
-            0x01 => &mut self.serial_transfer.0,
-            0x02 => &mut self.serial_transfer.1,
-            0x04..=0x07 => &mut self.timer_and_divider[(select_byte - 0x04) as usize],
-            0x10..=0x26 => &mut self.audio[(select_byte - 0x10) as usize],
-            0x30..=0x3F => &mut self.wave_pattern[(select_byte - 0x30) as usize],
-            0x40..=0x4B => &mut self.lcd[(select_byte - 0x40) as usize],
-            0x4F => &mut self.vram_bank_select,
-            0x50 => &mut self.boot_rom_disabled,
-            0x51..=0x55 => &mut self.vram_dma[(select_byte - 0x51) as usize],
-            0x68..=0x6B => &mut self.bg_obj_palettes[(select_byte - 0x68) as usize],
-            0x70 => &mut self.wram_bank_select,
+        let target: &mut u8 = &mut match select_byte {
+            0x00 => self.joypad_input,
+            0x01 => self.serial_transfer.0,
+            0x02 => self.serial_transfer.1,
+            0x04..=0x07 => self.timer_and_divider[(select_byte - 0x04) as usize],
+            0x10..=0x26 => self.audio[(select_byte - 0x10) as usize],
+            0x30..=0x3F => self.wave_pattern[(select_byte - 0x30) as usize],
+            0x40..=0x4B => self.lcd[(select_byte - 0x40) as usize],
+            0x4F => self.vram_bank_select,
+            0x50 => self.boot_rom_disabled,
+            0x51..=0x55 => self.vram_dma[(select_byte - 0x51) as usize],
+            0x68..=0x6B => self.bg_obj_palettes[(select_byte - 0x68) as usize],
+            0x70 => self.wram_bank_select,
             _ => panic!("Write for unmapped IO address: {:#06X}", address.addr),
         };
+
         *target = value;
     }
 }
@@ -134,6 +135,8 @@ impl IO {
 pub struct MMU {
     internal_ram: Vec<u8>,
     io: IO,
+    interrupt_enable: u8,
+    interrupt_flags: u8,
 }
 
 impl MMU {
@@ -141,11 +144,16 @@ impl MMU {
         MMU {
             internal_ram: vec![0x00; 0x3000],
             io: IO::new(),
+            interrupt_enable: 0x00,
+            interrupt_flags: 0x00,
         }
     }
 
     pub fn read(&self, address: Address) -> u8 {
-        // self.data[address.addr as usize]
+        if address.addr == 0xFF0F {
+            return self.interrupt_flags;
+        }
+
         match address.addr {
             0x0000..=0x7FFF => todo!("Read from cartridge"),
             0x8000..=0x9FFF => todo!("Read VRAM"),
@@ -154,9 +162,9 @@ impl MMU {
             0xE000..=0xFDFF => panic!("Read access for prohibited memory area"),
             0xFE00..=0xFE9F => todo!("Read OAM"),
             0xFEA0..=0xFEFF => panic!("Read access for prohibited memory area"),
-            0xFF00..=0xFF7F => todo!("Read from I/O registers"),
+            0xFF00..=0xFF7F => self.io.read(address),
             0xFF80..=0xFFFE => todo!("Read high RAM"),
-            0xFFFF => todo!("Read IE"),
+            0xFFFF => self.interrupt_enable,
         }
     }
 
@@ -168,6 +176,11 @@ impl MMU {
     }
 
     pub fn write(&mut self, address: Address, value: u8) {
+        if address.addr == 0xFF0F {
+            self.interrupt_flags = value;
+            return;
+        }
+
         match address.addr {
             0x0000..=0x7FFF => todo!("Write to cartridge"),
             0x8000..=0x9FFF => todo!("Write VRAM"),
@@ -176,9 +189,9 @@ impl MMU {
             0xE000..=0xFDFF => panic!("Write access for prohibited memory area"),
             0xFE00..=0xFE9F => todo!("Write OAM"),
             0xFEA0..=0xFEFF => panic!("Write access for prohibited memory area"),
-            0xFF00..=0xFF7F => todo!("Write to I/O registers"),
+            0xFF00..=0xFF7F => self.io.write(address, value),
             0xFF80..=0xFFFE => todo!("Write high RAM"),
-            0xFFFF => todo!("Write IE"),
+            0xFFFF => self.interrupt_enable = value,
         }
     }
 
