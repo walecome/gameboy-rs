@@ -132,21 +132,27 @@ impl IO {
     }
 }
 
-pub struct MMU {
+pub struct MMU<'a> {
+    rom_data: &'a Vec<u8>,
     internal_ram: Vec<u8>,
     io: IO,
     interrupt_enable: u8,
     interrupt_flags: u8,
 }
 
-impl MMU {
-    pub fn new() -> MMU {
+impl MMU<'_> {
+    pub fn new<'a>(rom_data: &'a Vec<u8>) -> MMU<'a> {
         MMU {
+            rom_data,
             internal_ram: vec![0x00; 0x3000],
             io: IO::new(),
             interrupt_enable: 0x00,
             interrupt_flags: 0x00,
         }
+    }
+
+    pub fn read_rom(&self, address: Address) -> u8 {
+        self.rom_data[address.addr as usize]
     }
 
     pub fn read(&self, address: Address) -> u8 {

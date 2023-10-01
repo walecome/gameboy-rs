@@ -50,10 +50,9 @@ impl Flags {
 }
 
 pub struct CPU<'a> {
-    rom_data: &'a Vec<u8>,
     pc: u16,
     sp: u16,
-    mmu: MMU,
+    mmu: MMU<'a>,
     a: u8,
     b: u8,
     c: u8,
@@ -72,7 +71,6 @@ pub struct CPU<'a> {
 impl fmt::Debug for CPU<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("CPU")
-            .field("rom_data", &"<omitted>".to_owned())
             .field("pc", &format_args!("{:#06X}", &self.pc))
             .field("sp", &format_args!("{:#06X}", &self.sp))
             .field("mmu", &"<omitted>".to_owned())
@@ -132,10 +130,9 @@ fn verify_state(
 impl CPU<'_> {
     pub fn new<'a>(rom_data: &'a Vec<u8>) -> CPU<'a> {
         CPU {
-            rom_data: &rom_data,
             pc: 0x0100,
             sp: 0x0FFFE,
-            mmu: MMU::new(),
+            mmu: MMU::new(rom_data),
             a: 0x00,
             b: 0x00,
             c: 0x00,
@@ -213,7 +210,8 @@ impl CPU<'_> {
     }
 
     fn read_u8(&mut self) -> u8 {
-        self.rom_data[self.next_pc() as usize]
+        let address = Address::new(self.next_pc());
+        self.mmu.read_rom(address)
     }
 
     fn read_u16(&mut self) -> u16 {
