@@ -118,6 +118,7 @@ pub enum Instruction {
     Sub(LogicalOpTarget),
     CbSrl(CbTarget),
     CbRr(CbTarget),
+    Rra,
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
@@ -509,6 +510,7 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
 
     match opcode {
         0x00 => Some(Instruction::Noop),
+        0x1F => Some(Instruction::Rra),
         0x76 => Some(Instruction::Halt),
         0xC3 => Some(Instruction::JumpImmediate),
         0xF3 => Some(Instruction::DisableInterrupts),

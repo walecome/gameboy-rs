@@ -198,6 +198,7 @@ impl CPU<'_> {
             Instruction::Sub(target) => self.sub(target),
             Instruction::CbSrl(target) => self.srl(target),
             Instruction::CbRr(target) => self.rr(target),
+            Instruction::Rra => self.rra(),
         }
 
         return true;
@@ -556,6 +557,11 @@ impl CPU<'_> {
         self.flags.n = true;
         self.flags.h = nibble_a < nibble_value;
         self.flags.c = self.a < value;
+    }
+
+    fn rra(&mut self) {
+        self.rr(CbTarget::Register(RegisterU8::A));
+        self.flags.z = false;
     }
 
     fn srl(&mut self, target: CbTarget) {
