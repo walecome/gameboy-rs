@@ -41,6 +41,14 @@ pub struct Flags {
     c: bool,
 }
 
+#[derive(Debug)]
+pub struct FlagChange {
+    z: Option<bool>,
+    n: Option<bool>,
+    h: Option<bool>,
+    c: Option<bool>,
+}
+
 impl Flags {
     pub fn new() -> Flags {
         Flags {
@@ -65,6 +73,7 @@ pub struct CPU<'a> {
     h: u8,
     l: u8,
     interrupts_enabled: bool,
+    // TODO: This should probably be register 'f'
     flags: Flags,
 
     // Debug
@@ -188,6 +197,7 @@ impl CPU<'_> {
             Instruction::AddU16(target) => self.add_u16(target),
             Instruction::Sub(target) => self.sub(target),
             Instruction::CbSrl(target) => self.srl(target),
+            Instruction::CbRr(target) => self.rr(target),
         }
 
         return true;
@@ -549,6 +559,42 @@ impl CPU<'_> {
     }
 
     fn srl(&mut self, target: CbTarget) {
+        self.apply_cb_target(target, |value| {
+            let carry = value & 0x1 != 0;
+
+            let result = value >> 1;
+
+            return (result, FlagChange {
+                z: Some(result == 0),
+                n: Some(false),
+                h: Some(false),
+                c: Some(carry),
+            });
+        });
+    }
+
+    fn rr(&mut self, target: CbTarget) {
+        let old_carry = self.flags.c;
+
+        self.apply_cb_target(target, |value| {
+            let new_carry = value & 0x1 != 0;
+
+            let result = if old_carry {
+                (value >> 1) | (1 << 7)
+            } else {
+                value >> 1
+            };
+
+            return (result, FlagChange {
+                z: Some(result == 0),
+                n: Some(false),
+                h: Some(false),
+                c: Some(new_carry),
+            });
+        });
+    }
+
+    fn apply_cb_target(&mut self, target: CbTarget, applier: impl Fn(u8) -> (u8, FlagChange)) {
         let value: u8 = match target {
             CbTarget::Register(reg) => {
                 *self.resolve_u8_reg(reg)
@@ -559,14 +605,9 @@ impl CPU<'_> {
             }
         };
 
-        let carry = value & 0x1 != 0;
+        let (result, flag_change) = applier(value);
 
-        let result = value >> 1;
-
-        self.flags.z = result == 0;
-        self.flags.n = false;
-        self.flags.h = false;
-        self.flags.c = carry;
+        self.apply_flag_change(flag_change);
 
         match target {
             CbTarget::Register(reg) => {
@@ -577,6 +618,24 @@ impl CPU<'_> {
                 self.mmu.write(address, result);
             }
         };
+    }
+
+    fn apply_flag_change(&mut self, flag_change: FlagChange) {
+        if let Some(z) = flag_change.z {
+            self.flags.z = z;
+        }
+
+        if let Some(n) = flag_change.n {
+            self.flags.n = n;
+        }
+
+        if let Some(h) = flag_change.h {
+            self.flags.h = h;
+        }
+
+        if let Some(c) = flag_change.c {
+            self.flags.c = c;
+        }
     }
 
     fn resolve_logical_op_target(&mut self, target: LogicalOpTarget) -> u8 {

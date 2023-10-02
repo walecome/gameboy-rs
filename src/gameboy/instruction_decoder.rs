@@ -117,6 +117,7 @@ pub enum Instruction {
     AddU16(U16Target),
     Sub(LogicalOpTarget),
     CbSrl(CbTarget),
+    CbRr(CbTarget),
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
@@ -538,6 +539,7 @@ fn resolve_cb_target(col: u8) -> CbTarget {
 pub fn decode_cb(opcode: u8) -> Option<Instruction> {
     let target = resolve_cb_target(opcode & 0xF);
     Some(match opcode {
+        0x18..=0x1F => Instruction::CbRr(target),
         0x38..=0x3F => Instruction::CbSrl(target),
         _ => return None,
     })
