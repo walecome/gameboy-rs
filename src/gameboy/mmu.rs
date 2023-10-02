@@ -137,10 +137,6 @@ impl MMU<'_> {
         }
     }
 
-    pub fn read_rom(&self, address: Address) -> u8 {
-        self.rom_data[address.index_value()]
-    }
-
     pub fn read(&self, address: Address) -> u8 {
         if address.value() == 0xFF0F {
             return self.interrupt_flags;

@@ -213,7 +213,7 @@ impl CPU<'_> {
 
     fn read_u8(&mut self) -> u8 {
         let address = Address::new(self.next_pc());
-        self.mmu.read_rom(address)
+        self.mmu.read(address)
     }
 
     fn read_u16(&mut self) -> u16 {
