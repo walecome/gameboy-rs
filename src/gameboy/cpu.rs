@@ -5,7 +5,8 @@ use super::instruction_decoder::{
     LoadSrcU8, LogicalOpTarget, RegisterU16, RegisterU8, U16Target,
 };
 
-use super::mmu::{MMU, Address, Word};
+use super::mmu::{MMU, Word};
+use super::address::Address;
 
 use super::reference::{ReferenceMetadata, ReferenceOpcode};
 

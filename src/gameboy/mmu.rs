@@ -1,23 +1,5 @@
-#[derive(Clone, Copy)]
-pub struct Address {
-    addr: u16,
-}
-
-impl Address {
-    pub fn new(addr: u16) -> Address {
-        Address {
-            addr,
-        }
-    }
-
-    pub fn from_lower(lower_addr: u8) -> Address {
-        Address::new(0xFF00 + lower_addr as u16)
-    }
-
-    fn next(&self) -> Self {
-        Self { addr: self.addr + 1 }
-    }
-}
+use super::address::Address;
+use super::video::Video;
 
 pub struct Word {
     pub value: u16,
@@ -84,9 +66,9 @@ impl IO {
     }
 
     fn read(&self, address: Address) -> u8 {
-        let select_byte: u8 = match address.addr {
-            0xFF00..=0xFF70 => (address.addr & 0xFF) as u8,
-            _ => panic!("Trying to read IO outside mapped area: {:#06X}", address.addr),
+        let select_byte: u8 = match address.value() {
+            0xFF00..=0xFF70 => (address.value() & 0xFF) as u8,
+            _ => panic!("Trying to read IO outside mapped area: {:#06X}", address.value()),
         };
 
         match select_byte {
@@ -102,14 +84,14 @@ impl IO {
             0x51..=0x55 => self.vram_dma[(select_byte - 0x51) as usize],
             0x68..=0x6B => self.bg_obj_palettes[(select_byte - 0x68) as usize],
             0x70 => self.wram_bank_select,
-            _ => panic!("Read for unmapped IO address: {:#06X}", address.addr),
+            _ => panic!("Read for unmapped IO address: {:#06X}", address.value()),
         }
     }
 
     fn write(& mut self, address: Address, value: u8) {
-        let select_byte: u8 = match address.addr {
-            0xFF00..=0xFF70 => (address.addr & 0xFF) as u8,
-            _ => panic!("Trying to write IO outside mapped area: {:#06X}", address.addr),
+        let select_byte: u8 = match address.value() {
+            0xFF00..=0xFF70 => (address.value() & 0xFF) as u8,
+            _ => panic!("Trying to write IO outside mapped area: {:#06X}", address.value()),
         };
 
         let target: &mut u8 = &mut match select_byte {
@@ -125,7 +107,7 @@ impl IO {
             0x51..=0x55 => self.vram_dma[(select_byte - 0x51) as usize],
             0x68..=0x6B => self.bg_obj_palettes[(select_byte - 0x68) as usize],
             0x70 => self.wram_bank_select,
-            _ => panic!("Write for unmapped IO address: {:#06X}", address.addr),
+            _ => panic!("Write for unmapped IO address: {:#06X}", address.value()),
         };
 
         *target = value;
@@ -134,8 +116,10 @@ impl IO {
 
 pub struct MMU<'a> {
     rom_data: &'a Vec<u8>,
+    video: Video,
     internal_ram: Vec<u8>,
     io: IO,
+    high_ram: Vec<u8>,
     interrupt_enable: u8,
     interrupt_flags: u8,
 }
@@ -144,32 +128,35 @@ impl MMU<'_> {
     pub fn new<'a>(rom_data: &'a Vec<u8>) -> MMU<'a> {
         MMU {
             rom_data,
+            video: Video::new(),
             internal_ram: vec![0x00; 0x3000],
             io: IO::new(),
+            high_ram: vec![0x00; 0x80],
             interrupt_enable: 0x00,
             interrupt_flags: 0x00,
         }
     }
 
     pub fn read_rom(&self, address: Address) -> u8 {
-        self.rom_data[address.addr as usize]
+        self.rom_data[address.index_value()]
     }
 
     pub fn read(&self, address: Address) -> u8 {
-        if address.addr == 0xFF0F {
+        if address.value() == 0xFF0F {
             return self.interrupt_flags;
         }
 
-        match address.addr {
-            0x0000..=0x7FFF => todo!("Read from cartridge"),
+        match address.value() {
+            0x0000..=0x3FFF => self.rom_data[address.index_value()],
+            0x4000..=0x7FFF => todo!("Read from cartridge (switchable bank)"),
             0x8000..=0x9FFF => todo!("Read VRAM"),
             0xA000..=0xBFFF => todo!("Read from cartridge RAM"),
-            0xC000..=0xDFFF => self.internal_ram[address.addr as usize - 0xC000],
+            0xC000..=0xDFFF => self.internal_ram[address.index_value() - 0xC000],
             0xE000..=0xFDFF => panic!("Read access for prohibited memory area"),
             0xFE00..=0xFE9F => todo!("Read OAM"),
             0xFEA0..=0xFEFF => panic!("Read access for prohibited memory area"),
             0xFF00..=0xFF7F => self.io.read(address),
-            0xFF80..=0xFFFE => todo!("Read high RAM"),
+            0xFF80..=0xFFFE => self.high_ram[address.index_value() - 0xFF80],
             0xFFFF => self.interrupt_enable,
         }
     }
@@ -182,21 +169,22 @@ impl MMU<'_> {
     }
 
     pub fn write(&mut self, address: Address, value: u8) {
-        if address.addr == 0xFF0F {
+        if address.value() == 0xFF0F {
             self.interrupt_flags = value;
             return;
         }
 
-        match address.addr {
-            0x0000..=0x7FFF => todo!("Write to cartridge"),
-            0x8000..=0x9FFF => todo!("Write VRAM"),
+        match address.value() {
+            0x0000..=0x3FFF => todo!("Write to cartridge"),
+            0x4000..=0x7FFF => todo!("Write to cartridge (switchable bank)"),
+            0x8000..=0x9FFF => self.video.write_vram(Address::new(address.value() - 0x8000), value),
             0xA000..=0xBFFF => todo!("Write to cartridge RAM"),
-            0xC000..=0xDFFF => self.internal_ram[address.addr as usize - 0xC000] = value,
+            0xC000..=0xDFFF => self.internal_ram[address.index_value() - 0xC000] = value,
             0xE000..=0xFDFF => panic!("Write access for prohibited memory area"),
             0xFE00..=0xFE9F => todo!("Write OAM"),
             0xFEA0..=0xFEFF => panic!("Write access for prohibited memory area"),
             0xFF00..=0xFF7F => self.io.write(address, value),
-            0xFF80..=0xFFFE => todo!("Write high RAM"),
+            0xFF80..=0xFFFE => self.high_ram[address.index_value() - 0xFF80] = value,
             0xFFFF => self.interrupt_enable = value,
         }
     }
