@@ -199,6 +199,7 @@ impl CPU<'_> {
             Instruction::CbSrl(target) => self.srl(target),
             Instruction::CbRr(target) => self.rr(target),
             Instruction::Rra => self.rra(),
+            Instruction::CbBit { n, target } => self.bit(n, target),
         }
 
         return true;
@@ -570,7 +571,7 @@ impl CPU<'_> {
 
             let result = value >> 1;
 
-            return (result, FlagChange {
+            return (Some(result), FlagChange {
                 z: Some(result == 0),
                 n: Some(false),
                 h: Some(false),
@@ -591,7 +592,7 @@ impl CPU<'_> {
                 value >> 1
             };
 
-            return (result, FlagChange {
+            return (Some(result), FlagChange {
                 z: Some(result == 0),
                 n: Some(false),
                 h: Some(false),
@@ -600,7 +601,20 @@ impl CPU<'_> {
         });
     }
 
-    fn apply_cb_target(&mut self, target: CbTarget, applier: impl Fn(u8) -> (u8, FlagChange)) {
+    fn bit(&mut self, n: u8, target: CbTarget) {
+        self.apply_cb_target(target, |value| {
+            let z = value & (1 << n) != 0;
+
+            return (None, FlagChange {
+                z: Some(z),
+                n: Some(false),
+                h: Some(true),
+                c: None,
+            });
+        });
+    }
+
+    fn apply_cb_target(&mut self, target: CbTarget, applier: impl Fn(u8) -> (Option<u8>, FlagChange)) {
         let value: u8 = match target {
             CbTarget::Register(reg) => {
                 *self.resolve_u8_reg(reg)
@@ -611,19 +625,21 @@ impl CPU<'_> {
             }
         };
 
-        let (result, flag_change) = applier(value);
+        let (maybe_result, flag_change) = applier(value);
 
         self.apply_flag_change(flag_change);
 
-        match target {
-            CbTarget::Register(reg) => {
-                *self.resolve_u8_reg(reg) = result;
-            },
-            CbTarget::AddressHL => {
-                let address = Address::new(self.hl());
-                self.mmu.write(address, result);
-            }
-        };
+        if let Some(result) = maybe_result {
+            match target {
+                CbTarget::Register(reg) => {
+                    *self.resolve_u8_reg(reg) = result;
+                },
+                CbTarget::AddressHL => {
+                    let address = Address::new(self.hl());
+                    self.mmu.write(address, result);
+                }
+            };
+        }
     }
 
     fn apply_flag_change(&mut self, flag_change: FlagChange) {
