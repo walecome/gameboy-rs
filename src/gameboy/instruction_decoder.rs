@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum RegisterU8 {
     A,
     B,
@@ -86,6 +86,12 @@ pub enum LogicalOpTarget {
 }
 
 #[derive(Debug)]
+pub enum CbTarget {
+    Register(RegisterU8),
+    AddressHL,
+}
+
+#[derive(Debug)]
 pub enum Instruction {
     Noop,
     Halt,
@@ -110,6 +116,7 @@ pub enum Instruction {
     AddU8(LogicalOpTarget),
     AddU16(U16Target),
     Sub(LogicalOpTarget),
+    CbSrl(CbTarget),
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
@@ -437,7 +444,6 @@ fn try_decode_sub_instruction(opcode: u8) -> Option<Instruction> {
     })
 }
 
-
 // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 pub fn decode(opcode: u8) -> Option<Instruction> {
     if let Some(instruction) = try_decode_u8_load_instruction(opcode) {
@@ -507,4 +513,32 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
         0xF3 => Some(Instruction::DisableInterrupts),
         _ => None,
     }
+}
+
+fn resolve_cb_target(col: u8) -> CbTarget {
+    let offset_col = if col < 0x8 {
+        col
+    } else {
+        col - 0x8
+    };
+    match offset_col {
+        0x0 => CbTarget::Register(RegisterU8::B),
+        0x1 => CbTarget::Register(RegisterU8::C),
+        0x2 => CbTarget::Register(RegisterU8::D),
+        0x3 => CbTarget::Register(RegisterU8::E),
+        0x4 => CbTarget::Register(RegisterU8::H),
+        0x5 => CbTarget::Register(RegisterU8::L),
+        0x6 => CbTarget::AddressHL,
+        0x7 => CbTarget::Register(RegisterU8::A),
+        _ => panic!("Invalid offset column: {}", offset_col),
+    }
+}
+
+// https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
+pub fn decode_cb(opcode: u8) -> Option<Instruction> {
+    let target = resolve_cb_target(opcode & 0xF);
+    Some(match opcode {
+        0x38..=0x3F => Instruction::CbSrl(target),
+        _ => return None,
+    })
 }

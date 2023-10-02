@@ -1,14 +1,16 @@
 use std::fmt;
 
+use crate::gameboy::instruction_decoder::decode_cb;
+
 use super::instruction_decoder::{
     decode, FlagCondition, IncDecU8Target, Instruction, LoadDstU16, LoadDstU8, LoadSrcU16,
-    LoadSrcU8, LogicalOpTarget, RegisterU16, RegisterU8, U16Target,
+    LoadSrcU8, LogicalOpTarget, RegisterU16, RegisterU8, U16Target, CbTarget,
 };
 
 use super::mmu::{MMU, Word};
 use super::address::Address;
 
-use super::reference::{ReferenceMetadata, ReferenceOpcode};
+use super::reference::ReferenceMetadata;
 
 struct RegisterPair<'a> {
     high: &'a mut u8,
@@ -94,7 +96,6 @@ fn verify_state(
     maybe_metadata: Option<&ReferenceMetadata>,
     i: usize,
     pc: u16,
-    opcode: u8,
 ) {
     if maybe_metadata.is_none() {
         return;
@@ -106,21 +107,7 @@ fn verify_state(
             "PC({:#06X}) != reference PC ({:#06X}). Metadata: {}",
             pc, metadata.pc, metadata.instruction
         ))
-    } else {
-        match metadata.opcode {
-            ReferenceOpcode::Plain(reference_opcode) => {
-                if opcode != reference_opcode {
-                    Some(format!(
-                        "opcode({:#04X}) != reference opcode ({:#04X}). Metadata: {}",
-                        opcode, reference_opcode, metadata.instruction
-                    ))
-                } else {
-                    None
-                }
-            }
-            ReferenceOpcode::CB(_) => todo!(),
-        }
-    };
+    } else { None };
 
     if let Some(message) = maybe_error_message {
         println!("CPU (tick {}): {:#?}", i, cpu);
@@ -150,15 +137,16 @@ impl CPU<'_> {
     pub fn tick(&mut self, maybe_metadata: Option<&ReferenceMetadata>, i: usize) -> bool {
         let pc = self.pc;
         let opcode = self.read_u8();
-        if opcode == 0xCB {
-            todo!("Implement CB instructions");
-        }
-        let instruction =
-            decode(opcode).expect(format!("Unknown opcode: {:#06X}: {:#04X}", pc, opcode).as_str());
+        let instruction = if opcode == 0xCB {
+            let cb_opcode = self.read_u8();
+            decode_cb(cb_opcode).expect(format!("Unknown CB opcode: {:#06X}: {:#04X}", pc, cb_opcode).as_str())
+        } else {
+            decode(opcode).expect(format!("Unknown opcode: {:#06X}: {:#04X}", pc, opcode).as_str())
+        };
         print!("{:.<1$}", "", 1 * self.depth);
         println!("{:#06X}: {:#04X} ({:?})", pc, opcode, instruction);
 
-        verify_state(self, maybe_metadata, i, pc, opcode);
+        verify_state(self, maybe_metadata, i, pc);
 
         match instruction {
             Instruction::Noop => {}
@@ -199,6 +187,7 @@ impl CPU<'_> {
             Instruction::AddU8(target) => self.add_u8(target),
             Instruction::AddU16(target) => self.add_u16(target),
             Instruction::Sub(target) => self.sub(target),
+            Instruction::CbSrl(target) => self.srl(target),
         }
 
         return true;
@@ -559,6 +548,37 @@ impl CPU<'_> {
         self.flags.c = self.a < value;
     }
 
+    fn srl(&mut self, target: CbTarget) {
+        let value: u8 = match target {
+            CbTarget::Register(reg) => {
+                *self.resolve_u8_reg(reg)
+            },
+            CbTarget::AddressHL => {
+                let address = Address::new(self.hl());
+                self.mmu.read(address)
+            }
+        };
+
+        let carry = value & 0x1 != 0;
+
+        let result = value >> 1;
+
+        self.flags.z = result == 0;
+        self.flags.n = false;
+        self.flags.h = false;
+        self.flags.c = carry;
+
+        match target {
+            CbTarget::Register(reg) => {
+                *self.resolve_u8_reg(reg) = result;
+            },
+            CbTarget::AddressHL => {
+                let address = Address::new(self.hl());
+                self.mmu.write(address, result);
+            }
+        };
+    }
+
     fn resolve_logical_op_target(&mut self, target: LogicalOpTarget) -> u8 {
         match target {
             LogicalOpTarget::Register(reg) => *self.resolve_u8_reg(reg),
@@ -581,5 +601,9 @@ impl CPU<'_> {
             FlagCondition::C => self.flags.c,
             FlagCondition::NC => !self.flags.c,
         }
+    }
+
+    fn hl(&mut self) -> u16 {
+        self.resolve_u16_reg(&RegisterU16::HL).get()
     }
 }
