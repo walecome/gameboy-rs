@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::gameboy::instruction_decoder::decode_cb;
 
+use super::cartridge::Cartridge;
 use super::instruction_decoder::{
     decode, FlagCondition, IncDecU8Target, Instruction, LoadDstU16, LoadDstU8, LoadSrcU16,
     LoadSrcU8, LogicalOpTarget, RegisterU16, RegisterU8, U16Target, CbTarget,
@@ -60,10 +61,10 @@ impl Flags {
     }
 }
 
-pub struct CPU<'a> {
+pub struct CPU {
     pc: u16,
     sp: u16,
-    mmu: MMU<'a>,
+    mmu: MMU,
     a: u8,
     b: u8,
     c: u8,
@@ -80,7 +81,7 @@ pub struct CPU<'a> {
     depth: usize,
 }
 
-impl fmt::Debug for CPU<'_> {
+impl fmt::Debug for CPU {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("CPU")
             .field("pc", &format_args!("{:#06X}", &self.pc))
@@ -124,12 +125,12 @@ fn verify_state(
     }
 }
 
-impl CPU<'_> {
-    pub fn new<'a>(rom_data: &'a Vec<u8>) -> CPU<'a> {
+impl CPU {
+    pub fn new(cartridge: Box<dyn Cartridge>) -> CPU {
         CPU {
             pc: 0x0100,
             sp: 0x0FFFE,
-            mmu: MMU::new(rom_data),
+            mmu: MMU::new(cartridge),
             a: 0x00,
             b: 0x00,
             c: 0x00,

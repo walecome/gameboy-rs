@@ -1,4 +1,5 @@
 pub mod address;
+pub mod cartridge;
 pub mod cpu;
 pub mod header;
 pub mod instruction_decoder;

@@ -1,20 +1,20 @@
 use std::str;
 
 #[derive(Debug)]
-enum FlagCGB {
+pub enum FlagCGB {
     WorksWithOld,
     RequiresNew,
 }
 
 #[derive(Debug)]
-struct TitleInfo {
+pub struct TitleInfo {
     title: String,
     manufacturer_code: Option<String>,
     flag: FlagCGB,
 }
 
 #[derive(Debug)]
-enum FlagSGB {
+pub enum FlagSGB {
     NoSGB,
     SGB,
 }
@@ -61,8 +61,8 @@ fn read_title_info(data: &Vec<u8>) -> Result<TitleInfo, String> {
     })
 }
 
-#[derive(Debug)]
-enum CartridgeType {
+#[derive(Debug, Copy, Clone)]
+pub enum CartridgeType {
     RomOnly,
     MBC1,
     MBC1Ram,
@@ -132,7 +132,7 @@ impl CartridgeType {
 }
 
 #[derive(Debug)]
-enum RomSize {
+pub enum RomSize {
     NoBanking,
     WithBanking(usize),
 }
@@ -160,7 +160,7 @@ impl RomSize {
 
 #[derive(Debug)]
 #[allow(dead_code)]
-enum RamSize {
+pub enum RamSize {
     NoBanks,
     Size {
         bank_count: usize,
@@ -183,14 +183,14 @@ impl RamSize {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct Header {
-    title: String,
-    manufacturer_code: Option<String>,
-    cgb_flag: FlagCGB,
-    license_code: Option<String>,
-    sgb_flag: FlagSGB,
-    cartridge_type: CartridgeType,
-    rom_size: RomSize,
-    ram_size: RamSize,
+    pub title: String,
+    pub manufacturer_code: Option<String>,
+    pub cgb_flag: FlagCGB,
+    pub license_code: Option<String>,
+    pub sgb_flag: FlagSGB,
+    pub cartridge_type: CartridgeType,
+    pub rom_size: RomSize,
+    pub ram_size: RamSize,
 }
 
 impl Header {

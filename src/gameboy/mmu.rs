@@ -1,4 +1,5 @@
 use super::address::Address;
+use super::cartridge::Cartridge;
 use super::video::Video;
 
 pub struct Word {
@@ -114,8 +115,8 @@ impl IO {
     }
 }
 
-pub struct MMU<'a> {
-    rom_data: &'a Vec<u8>,
+pub struct MMU {
+    cartridge: Box<dyn Cartridge>,
     video: Video,
     internal_ram: Vec<u8>,
     io: IO,
@@ -124,10 +125,10 @@ pub struct MMU<'a> {
     interrupt_flags: u8,
 }
 
-impl MMU<'_> {
-    pub fn new<'a>(rom_data: &'a Vec<u8>) -> MMU<'a> {
+impl MMU {
+    pub fn new(cartridge: Box<dyn Cartridge>) -> MMU {
         MMU {
-            rom_data,
+            cartridge,
             video: Video::new(),
             internal_ram: vec![0x00; 0x3000],
             io: IO::new(),
@@ -143,7 +144,7 @@ impl MMU<'_> {
         }
 
         match address.value() {
-            0x0000..=0x3FFF => self.rom_data[address.index_value()],
+            0x0000..=0x3FFF => self.cartridge.read(address),
             0x4000..=0x7FFF => todo!("Read from cartridge (switchable bank)"),
             0x8000..=0x9FFF => todo!("Read VRAM"),
             0xA000..=0xBFFF => todo!("Read from cartridge RAM"),
