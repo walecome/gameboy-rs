@@ -172,7 +172,7 @@ impl MMU {
         }
 
         match address.value() {
-            0x0000..=0x3FFF => todo!("Write to cartridge"),
+            0x0000..=0x3FFF => self.cartridge.write(address, value),
             0x4000..=0x7FFF => todo!("Write to cartridge (switchable bank)"),
             0x8000..=0x9FFF => self.video.write_vram(Address::new(address.value() - 0x8000), value),
             0xA000..=0xBFFF => todo!("Write to cartridge RAM"),
