@@ -200,6 +200,7 @@ impl CPU {
                 //       cycles, with one byte being read, so I believe it's the latter.
                 self.pc = self.hl();
             }
+            Instruction::CbSwap(target) => self.swap(target),
         }
 
         return true;
@@ -639,6 +640,19 @@ impl CPU {
         });
     }
 
+    fn swap(&mut self, target: CbTarget) {
+        self.apply_cb_target(target, |value| {
+            let result = swap_nibbles(value);
+
+            return (Some(result), FlagChange {
+                z: Some(result == 0),
+                n: Some(false),
+                h: Some(false),
+                c: Some(false),
+            })
+        });
+    }
+
     fn apply_cb_target(&mut self, target: CbTarget, applier: impl Fn(u8) -> (Option<u8>, FlagChange)) {
         let value: u8 = match target {
             CbTarget::Register(reg) => {
@@ -711,5 +725,20 @@ impl CPU {
 
     fn hl(&mut self) -> u16 {
         self.resolve_u16_reg(&RegisterU16::HL).get()
+    }
+}
+
+fn swap_nibbles(value: u8) -> u8 {
+   ((value & 0x0F) << 4) | ((value & 0xF0) >> 4)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_swap_nibbles() {
+        assert_eq!(swap_nibbles(0xAB), 0xBA);
+        assert_eq!(swap_nibbles(0x0F), 0xF0);
+        assert_eq!(swap_nibbles(0xF0), 0x0F);
     }
 }

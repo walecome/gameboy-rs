@@ -120,6 +120,7 @@ pub enum Instruction {
     CbSrl(CbTarget),
     CbRr(CbTarget),
     CbBit { n: u8, target: CbTarget },
+    CbSwap(CbTarget),
     Rra,
     Adc(LogicalOpTarget),
 }
@@ -549,6 +550,7 @@ pub fn decode_cb(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
         0x18..=0x1F => Instruction::CbRr(target),
         0x38..=0x3F => Instruction::CbSrl(target),
+        0x30..=0x37 => Instruction::CbSwap(target),
         0x40..=0x47 => Instruction::CbBit { n: 0, target, },
         _ => return None,
     })
