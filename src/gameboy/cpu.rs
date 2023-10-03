@@ -192,6 +192,13 @@ impl CPU<'_> {
             Instruction::Rra => self.rra(),
             Instruction::CbBit { n, target } => self.bit(n, target),
             Instruction::Adc(target) => self.adc(target),
+            Instruction::JumpAddressHL => {
+                // NOTE: This instruction has conflicting documentation.
+                //       It's specified as `JP (HL)`, so "PC = memory value for address HL".
+                //       But some docs specify to just do `PC = HL`. The timing is also 4
+                //       cycles, with one byte being read, so I believe it's the latter.
+                self.pc = self.hl();
+            }
         }
 
         return true;

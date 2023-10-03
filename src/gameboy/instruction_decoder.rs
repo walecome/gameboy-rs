@@ -98,6 +98,7 @@ pub enum Instruction {
     LoadU8 { dst: LoadDstU8, src: LoadSrcU8 },
     LoadU16 { dst: LoadDstU16, src: LoadSrcU16 },
     JumpImmediate(Option<FlagCondition>),
+    JumpAddressHL,
     DisableInterrupts,
     Call(Option<FlagCondition>),
     JumpRelative(Option<FlagCondition>),
@@ -517,6 +518,7 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
         0x00 => Some(Instruction::Noop),
         0x1F => Some(Instruction::Rra),
         0x76 => Some(Instruction::Halt),
+        0xE9 => Some(Instruction::JumpAddressHL),
         0xF3 => Some(Instruction::DisableInterrupts),
         _ => None,
     }
