@@ -97,7 +97,7 @@ pub enum Instruction {
     Halt,
     LoadU8 { dst: LoadDstU8, src: LoadSrcU8 },
     LoadU16 { dst: LoadDstU16, src: LoadSrcU16 },
-    JumpImmediate,
+    JumpImmediate(Option<FlagCondition>),
     DisableInterrupts,
     Call(Option<FlagCondition>),
     JumpRelative(Option<FlagCondition>),
@@ -409,6 +409,19 @@ fn try_decode_adc_instruction(opcode: u8) -> Option<Instruction> {
     })
 }
 
+fn try_decode_jp_instruction(opcode: u8) -> Option<Instruction> {
+    Some(match opcode {
+        0xC2 => Instruction::JumpImmediate(Some(FlagCondition::NZ)),
+        0xD2 => Instruction::JumpImmediate(Some(FlagCondition::NC)),
+
+        0xC3 => Instruction::JumpImmediate(None),
+
+        0xCA => Instruction::JumpImmediate(Some(FlagCondition::Z)),
+        0xDA => Instruction::JumpImmediate(Some(FlagCondition::C)),
+        _ => return None,
+    })
+}
+
 fn resolve_logical_op_target(col: u8) -> LogicalOpTarget{
 
     let offset_col = if col < 0x8 {
@@ -495,12 +508,15 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
         return Some(instruction);
     }
 
+    if let Some(instruction) = try_decode_jp_instruction(opcode) {
+        return Some(instruction);
+    }
+
 
     match opcode {
         0x00 => Some(Instruction::Noop),
         0x1F => Some(Instruction::Rra),
         0x76 => Some(Instruction::Halt),
-        0xC3 => Some(Instruction::JumpImmediate),
         0xF3 => Some(Instruction::DisableInterrupts),
         _ => None,
     }

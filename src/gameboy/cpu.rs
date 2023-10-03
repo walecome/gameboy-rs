@@ -164,22 +164,15 @@ impl CPU<'_> {
                 self.write_u8_target(dst, value);
             }
             Instruction::Halt => return false,
-            Instruction::JumpImmediate => {
-                let address = self.read_u16();
-                self.pc = address;
-            }
+            Instruction::JumpImmediate(condition) => self.jump_immediate(condition),
             Instruction::DisableInterrupts => self.interrupts_enabled = false,
             Instruction::LoadU16 { dst, src } => {
                 let value = self.read_u16_target(src);
                 self.write_u16_target(dst, value);
             }
-            Instruction::Call(condition) => {
-                self.call(condition);
-            }
+            Instruction::Call(condition) => self.call(condition),
             Instruction::JumpRelative(condition) => self.relative_jump(condition),
-            Instruction::Ret(condition) => {
-                self.ret(condition);
-            }
+            Instruction::Ret(condition) => self.ret(condition),
             Instruction::Push(reg) => self.push(reg),
             Instruction::Pop(reg) => self.pop(reg),
             Instruction::Or(target) => self.or(target),
@@ -359,6 +352,13 @@ impl CPU<'_> {
         let word = self.mmu.read_word(Address::new(self.sp));
         self.sp += 2;
         word.value
+    }
+
+    fn jump_immediate(&mut self, condition: Option<FlagCondition>) {
+        let address = self.read_u16();
+        if self.is_flag_condition_true(condition) {
+            self.pc = address;
+        }
     }
 
     fn relative_jump(&mut self, condition: Option<FlagCondition>) {
