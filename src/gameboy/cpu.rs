@@ -175,11 +175,9 @@ impl CPU<'_> {
             }
             Instruction::Call(condition) => {
                 self.call(condition);
-                self.depth += 1;
             }
             Instruction::JumpRelative(condition) => self.relative_jump(condition),
             Instruction::Ret(condition) => {
-                self.depth -= 1;
                 self.ret(condition);
             }
             Instruction::Push(reg) => self.push(reg),
@@ -345,6 +343,7 @@ impl CPU<'_> {
     fn call(&mut self, condition: Option<FlagCondition>) {
         let target_address = self.read_u16();
         if self.is_flag_condition_true(condition) {
+            self.depth += 1;
             self.stack_push(self.pc);
             self.pc = target_address;
         }
@@ -375,6 +374,8 @@ impl CPU<'_> {
         if self.is_flag_condition_true(condition) {
             let new_pc = self.stack_pop();
             self.pc = new_pc;
+            assert!(self.depth != 0);
+            self.depth -= 1;
         }
     }
 
