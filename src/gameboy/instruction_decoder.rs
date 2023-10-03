@@ -324,15 +324,7 @@ fn try_decode_inc_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_or_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0xB0 => Instruction::Or(LogicalOpTarget::Register(RegisterU8::B)),
-        0xB1 => Instruction::Or(LogicalOpTarget::Register(RegisterU8::C)),
-        0xB2 => Instruction::Or(LogicalOpTarget::Register(RegisterU8::D)),
-        0xB3 => Instruction::Or(LogicalOpTarget::Register(RegisterU8::E)),
-        0xB4 => Instruction::Or(LogicalOpTarget::Register(RegisterU8::H)),
-        0xB5 => Instruction::Or(LogicalOpTarget::Register(RegisterU8::L)),
-        0xB6 => Instruction::Or(LogicalOpTarget::AddressHL),
-        0xB7 => Instruction::Or(LogicalOpTarget::Register(RegisterU8::A)),
-
+        0xB0..=0xB7 => Instruction::Or(resolve_logical_op_target(opcode & 0xF)),
         0xF6 => Instruction::Or(LogicalOpTarget::ImmediateU8),
         _ => return None,
     })
@@ -340,15 +332,7 @@ fn try_decode_or_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_compare_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0xB8 => Instruction::Compare(LogicalOpTarget::Register(RegisterU8::B)),
-        0xB9 => Instruction::Compare(LogicalOpTarget::Register(RegisterU8::C)),
-        0xBA => Instruction::Compare(LogicalOpTarget::Register(RegisterU8::D)),
-        0xBB => Instruction::Compare(LogicalOpTarget::Register(RegisterU8::E)),
-        0xBC => Instruction::Compare(LogicalOpTarget::Register(RegisterU8::H)),
-        0xBD => Instruction::Compare(LogicalOpTarget::Register(RegisterU8::L)),
-        0xBE => Instruction::Compare(LogicalOpTarget::AddressHL),
-        0xBF => Instruction::Compare(LogicalOpTarget::Register(RegisterU8::A)),
-
+        0xB8..=0xBF => Instruction::Compare(resolve_logical_op_target(opcode & 0xF)),
         0xFE => Instruction::Compare(LogicalOpTarget::ImmediateU8),
         _ => return None,
     })
@@ -356,15 +340,7 @@ fn try_decode_compare_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_and_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0xA0 => Instruction::And(LogicalOpTarget::Register(RegisterU8::B)),
-        0xA1 => Instruction::And(LogicalOpTarget::Register(RegisterU8::C)),
-        0xA2 => Instruction::And(LogicalOpTarget::Register(RegisterU8::D)),
-        0xA3 => Instruction::And(LogicalOpTarget::Register(RegisterU8::E)),
-        0xA4 => Instruction::And(LogicalOpTarget::Register(RegisterU8::H)),
-        0xA5 => Instruction::And(LogicalOpTarget::Register(RegisterU8::L)),
-        0xA6 => Instruction::And(LogicalOpTarget::AddressHL),
-        0xA7 => Instruction::And(LogicalOpTarget::Register(RegisterU8::A)),
-
+        0xA0..=0xA7 => Instruction::And(resolve_logical_op_target(opcode & 0xF)),
         0xE6 => Instruction::And(LogicalOpTarget::ImmediateU8),
         _ => return None,
     })
@@ -393,15 +369,7 @@ fn try_decode_dec_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_xor_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0xA8 => Instruction::Xor(LogicalOpTarget::Register(RegisterU8::B)),
-        0xA9 => Instruction::Xor(LogicalOpTarget::Register(RegisterU8::C)),
-        0xAA => Instruction::Xor(LogicalOpTarget::Register(RegisterU8::D)),
-        0xAB => Instruction::Xor(LogicalOpTarget::Register(RegisterU8::E)),
-        0xAC => Instruction::Xor(LogicalOpTarget::Register(RegisterU8::H)),
-        0xAD => Instruction::Xor(LogicalOpTarget::Register(RegisterU8::L)),
-        0xAE => Instruction::Xor(LogicalOpTarget::AddressHL),
-        0xAF => Instruction::Xor(LogicalOpTarget::Register(RegisterU8::A)),
-
+        0xA8..=0xAF => Instruction::Xor(resolve_logical_op_target(opcode & 0xF)),
         0xEE => Instruction::Xor(LogicalOpTarget::ImmediateU8),
         _ => return None,
     })
@@ -417,14 +385,7 @@ fn try_decode_add_instruction(opcode: u8) -> Option<Instruction> {
 
         0xE8 => Instruction::AddStackPointer,
 
-        0x80 => Instruction::AddU8(LogicalOpTarget::Register(RegisterU8::B)),
-        0x81 => Instruction::AddU8(LogicalOpTarget::Register(RegisterU8::C)),
-        0x82 => Instruction::AddU8(LogicalOpTarget::Register(RegisterU8::D)),
-        0x83 => Instruction::AddU8(LogicalOpTarget::Register(RegisterU8::E)),
-        0x84 => Instruction::AddU8(LogicalOpTarget::Register(RegisterU8::H)),
-        0x85 => Instruction::AddU8(LogicalOpTarget::Register(RegisterU8::L)),
-        0x86 => Instruction::AddU8(LogicalOpTarget::AddressHL),
-        0x87 => Instruction::AddU8(LogicalOpTarget::Register(RegisterU8::A)),
+        0x80..=0x87 => Instruction::AddU8(resolve_logical_op_target(opcode & 0xF)),
 
         0xC6 => Instruction::AddU8(LogicalOpTarget::ImmediateU8),
         _ => return None,
@@ -433,18 +394,30 @@ fn try_decode_add_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_sub_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0x90 => Instruction::Sub(LogicalOpTarget::Register(RegisterU8::B)),
-        0x91 => Instruction::Sub(LogicalOpTarget::Register(RegisterU8::C)),
-        0x92 => Instruction::Sub(LogicalOpTarget::Register(RegisterU8::D)),
-        0x93 => Instruction::Sub(LogicalOpTarget::Register(RegisterU8::E)),
-        0x94 => Instruction::Sub(LogicalOpTarget::Register(RegisterU8::H)),
-        0x95 => Instruction::Sub(LogicalOpTarget::Register(RegisterU8::L)),
-        0x96 => Instruction::Sub(LogicalOpTarget::AddressHL),
-        0x97 => Instruction::Sub(LogicalOpTarget::Register(RegisterU8::A)),
-
+        0x90..=0x97 => Instruction::Sub(resolve_logical_op_target(opcode & 0xF)),
         0xD6 => Instruction::Sub(LogicalOpTarget::ImmediateU8),
         _ => return None,
     })
+}
+
+fn resolve_logical_op_target(col: u8) -> LogicalOpTarget{
+
+    let offset_col = if col < 0x8 {
+        col
+    } else {
+        col - 0x8
+    };
+    match offset_col {
+        0x0 => LogicalOpTarget::Register(RegisterU8::B),
+        0x1 => LogicalOpTarget::Register(RegisterU8::C),
+        0x2 => LogicalOpTarget::Register(RegisterU8::D),
+        0x3 => LogicalOpTarget::Register(RegisterU8::E),
+        0x4 => LogicalOpTarget::Register(RegisterU8::H),
+        0x5 => LogicalOpTarget::Register(RegisterU8::L),
+        0x6 => LogicalOpTarget::AddressHL,
+        0x7 => LogicalOpTarget::Register(RegisterU8::A),
+        _ => panic!("Invalid offset column: {}", offset_col),
+    }
 }
 
 // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
