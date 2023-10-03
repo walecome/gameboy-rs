@@ -120,6 +120,7 @@ pub enum Instruction {
     CbRr(CbTarget),
     CbBit { n: u8, target: CbTarget },
     Rra,
+    Adc(LogicalOpTarget),
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
@@ -400,6 +401,14 @@ fn try_decode_sub_instruction(opcode: u8) -> Option<Instruction> {
     })
 }
 
+fn try_decode_adc_instruction(opcode: u8) -> Option<Instruction> {
+    Some(match opcode {
+        0x88..=0x8F => Instruction::Adc(resolve_logical_op_target(opcode & 0xF)),
+        0xCE => Instruction::Adc(LogicalOpTarget::ImmediateU8),
+        _ => return None,
+    })
+}
+
 fn resolve_logical_op_target(col: u8) -> LogicalOpTarget{
 
     let offset_col = if col < 0x8 {
@@ -481,6 +490,11 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
     if let Some(instruction) = try_decode_sub_instruction(opcode) {
         return Some(instruction);
     }
+
+    if let Some(instruction) = try_decode_adc_instruction(opcode) {
+        return Some(instruction);
+    }
+
 
     match opcode {
         0x00 => Some(Instruction::Noop),

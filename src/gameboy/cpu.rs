@@ -198,6 +198,7 @@ impl CPU<'_> {
             Instruction::CbRr(target) => self.rr(target),
             Instruction::Rra => self.rra(),
             Instruction::CbBit { n, target } => self.bit(n, target),
+            Instruction::Adc(target) => self.adc(target),
         }
 
         return true;
@@ -516,6 +517,21 @@ impl CPU<'_> {
         self.flags.n = false;
         self.flags.h = (hl & 0xFFF) + (rhs & 0xFFF) > 0xFFF;
         self.flags.c = result > 0xFFFF;
+    }
+
+    fn adc(&mut self, target: LogicalOpTarget) {
+        let value = self.resolve_logical_op_target(target);
+        let carry_value: u8 = if self.flags.c { 1 } else { 0 };
+
+        let half_carry = (self.a & 0xF) + (value & 0xF) + carry_value > 0xF;
+        let result = (self.a as u16) + (value as u16) + (carry_value as u16);
+
+        self.a = result as u8;
+
+        self.flags.z = self.a == 0;
+        self.flags.n = false;
+        self.flags.h = half_carry;
+        self.flags.c = result > 0xFF;
     }
 
     fn sub(&mut self, target: LogicalOpTarget) {
