@@ -249,6 +249,7 @@ impl CPU {
             Instruction::CbRr(target) => self.rr(target),
             Instruction::CbRl(target) => self.rl(target),
             Instruction::Rra => self.rra(),
+            Instruction::Rla => self.rla(),
             Instruction::CbBit { n, target } => self.bit(n, target),
             Instruction::Adc(target) => self.adc(target),
             Instruction::JumpAddressHL => {
@@ -680,6 +681,11 @@ impl CPU {
 
     fn rra(&mut self) {
         self.rr(CbTarget::Register(RegisterU8::A));
+        self.flag_register.set_z(false);
+    }
+
+    fn rla(&mut self) {
+        self.rl(CbTarget::Register(RegisterU8::A));
         self.flag_register.set_z(false);
     }
 

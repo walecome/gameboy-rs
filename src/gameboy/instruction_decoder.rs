@@ -120,6 +120,7 @@ pub enum Instruction {
     CbBit { n: u8, target: CbTarget },
     CbSwap(CbTarget),
     Rra,
+    Rla,
     Adc(LogicalOpTarget),
 }
 
@@ -515,6 +516,7 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
 
     match opcode {
         0x00 => Some(Instruction::Noop),
+        0x17 => Some(Instruction::Rla),
         0x1F => Some(Instruction::Rra),
         0x76 => Some(Instruction::Halt),
         0xE9 => Some(Instruction::JumpAddressHL),
