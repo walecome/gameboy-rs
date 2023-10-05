@@ -144,8 +144,7 @@ impl MMU {
         }
 
         match address.value() {
-            0x0000..=0x3FFF => self.cartridge.read(address),
-            0x4000..=0x7FFF => todo!("Read from cartridge (switchable bank)"),
+            0x0000..=0x7FFF => self.cartridge.read(address),
             0x8000..=0x9FFF => todo!("Read VRAM"),
             0xA000..=0xBFFF => todo!("Read from cartridge RAM"),
             0xC000..=0xDFFF => self.internal_ram[address.index_value() - 0xC000],

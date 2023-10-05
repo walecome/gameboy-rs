@@ -25,9 +25,16 @@ impl Cartridge for MBC1 {
     fn read(&self, address: Address) -> u8 {
         match address.value() {
             0x0000..=0x3FFF => self.rom_data[address.index_value()],
+            0x4000..=0x7FFF => {
+                let normalized_addr = address.value() - 0x4000;
+                let bank_offset_addr = 0x4000 * (self.rom_bank as u16);
+                let addr = bank_offset_addr + normalized_addr;
+                self.rom_data[addr as usize]
+            },
             _ => todo!("Read from unmapped or unimplemented cartridge address: {:#06X}", address.value()),
         }
     }
+
     fn write(&mut self, address: Address, value: u8) {
         match address.value() {
             0x2000..=0x3FFF => {
