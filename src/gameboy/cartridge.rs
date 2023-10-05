@@ -34,7 +34,7 @@ impl Cartridge for MBC1 {
                 if value > 0b0001_1111 {
                     todo!("Invalid BANK1 register value '{:04X}'. Should we allow this?", value);
                 }
-                let fixed_value = if value & 0x1 != 0 {
+                let fixed_value = if value & 0x1 == 0 {
                     value + 1
                 } else {
                     value
