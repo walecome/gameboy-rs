@@ -18,11 +18,14 @@ struct RegisterPair<'a> {
     low: &'a mut u8,
 }
 
+struct ImmutableRegisterPair<'a> {
+    high: &'a u8,
+    low: &'a u8,
+}
+
 impl RegisterPair<'_> {
     fn get(&self) -> u16 {
-        let high = self.high.clone() as u16;
-        let low = self.low.clone() as u16;
-        return high << 8 | low;
+        ImmutableRegisterPair { high: self.high, low: self.low, }.get()
     }
 
     fn set(&mut self, value: u16) {
@@ -34,12 +37,84 @@ impl RegisterPair<'_> {
     }
 }
 
+impl ImmutableRegisterPair<'_> {
+    fn get(&self) -> u16 {
+        let high = self.high.clone() as u16;
+        let low = self.low.clone() as u16;
+        return high << 8 | low;
+    }
+}
+
 #[derive(Debug)]
-pub struct Flags {
+#[allow(dead_code)]
+struct FlagDebug {
     z: bool,
     n: bool,
     h: bool,
     c: bool,
+}
+
+pub struct FlagRegister {
+    value: u8,
+}
+
+fn get_bit(value: u8, bit: u8) -> bool {
+    value & (1 << bit) != 0
+}
+
+fn set_bit(value: u8, bit: u8, bit_value: bool) -> u8 {
+    if bit_value {
+        value | (1 << bit)
+    } else {
+        value & !(1 << bit)
+    }
+}
+
+impl FlagRegister {
+    fn new() -> Self {
+        Self { value: 0x00, }
+    }
+
+    fn get_z(&self) -> bool {
+        get_bit(self.value, 7)
+    }
+
+    fn get_n(&self) -> bool {
+        get_bit(self.value, 6)
+    }
+
+    fn get_h(&self) -> bool {
+        get_bit(self.value, 5)
+    }
+
+    fn get_c(&self) -> bool {
+        get_bit(self.value, 4)
+    }
+
+    fn set_z(&mut self, bit_value: bool) {
+        self.value = set_bit(self.value, 7, bit_value);
+    }
+
+    fn set_n(&mut self, bit_value: bool) {
+        self.value = set_bit(self.value, 6, bit_value);
+    }
+
+    fn set_h(&mut self, bit_value: bool) {
+        self.value = set_bit(self.value, 5, bit_value);
+    }
+
+    fn set_c(&mut self, bit_value: bool) {
+        self.value = set_bit(self.value, 4, bit_value);
+    }
+
+    fn debug_obj(&self) -> FlagDebug {
+        FlagDebug {
+            z: self.get_z(),
+            n: self.get_n(),
+            h: self.get_h(),
+            c: self.get_c(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -48,17 +123,6 @@ pub struct FlagChange {
     n: Option<bool>,
     h: Option<bool>,
     c: Option<bool>,
-}
-
-impl Flags {
-    pub fn new() -> Flags {
-        Flags {
-            z: false,
-            n: false,
-            h: false,
-            c: false,
-        }
-    }
 }
 
 pub struct CPU {
@@ -70,12 +134,10 @@ pub struct CPU {
     c: u8,
     d: u8,
     e: u8,
-    f: u8,
     h: u8,
     l: u8,
     interrupts_enabled: bool,
-    // TODO: This should probably be register 'f'
-    flags: Flags,
+    flag_register: FlagRegister,
 
     // Debug
     depth: usize,
@@ -87,16 +149,12 @@ impl fmt::Debug for CPU {
             .field("pc", &format_args!("{:#06X}", &self.pc))
             .field("sp", &format_args!("{:#06X}", &self.sp))
             .field("mmu", &"<omitted>".to_owned())
-            .field("a", &format_args!("{:#04X}", &self.a))
-            .field("b", &format_args!("{:#04X}", &self.b))
-            .field("c", &format_args!("{:#04X}", &self.c))
-            .field("d", &format_args!("{:#04X}", &self.d))
-            .field("e", &format_args!("{:#04X}", &self.e))
-            .field("f", &format_args!("{:#04X}", &self.f))
-            .field("h", &format_args!("{:#04X}", &self.h))
-            .field("l", &format_args!("{:#04X}", &self.l))
+            .field("AF", &format_args!("{:#06X}", &self.resolve_u16_reg_immutable(&RegisterU16::AF).get()))
+            .field("BC", &format_args!("{:#06X}", &self.resolve_u16_reg_immutable(&RegisterU16::BC).get()))
+            .field("DE", &format_args!("{:#06X}", &self.resolve_u16_reg_immutable(&RegisterU16::DE).get()))
+            .field("HL", &format_args!("{:#06X}", &self.resolve_u16_reg_immutable(&RegisterU16::HL).get()))
             .field("interrupts_enabled", &self.interrupts_enabled)
-            .field("flags", &self.flags)
+            .field("flags", &self.flag_register.debug_obj())
             .finish()
     }
 }
@@ -136,11 +194,10 @@ impl CPU {
             c: 0x00,
             d: 0x00,
             e: 0x00,
-            f: 0x00,
             h: 0x00,
             l: 0x00,
             interrupts_enabled: false,
-            flags: Flags::new(),
+            flag_register: FlagRegister::new(),
             depth: 0,
         }
     }
@@ -230,7 +287,6 @@ impl CPU {
             RegisterU8::C => &mut self.c,
             RegisterU8::D => &mut self.d,
             RegisterU8::E => &mut self.e,
-            RegisterU8::F => &mut self.f,
             RegisterU8::H => &mut self.h,
             RegisterU8::L => &mut self.l,
         }
@@ -238,12 +294,22 @@ impl CPU {
 
     fn resolve_u16_reg(&mut self, reg: &RegisterU16) -> RegisterPair {
         let (high, low) = match reg {
-            RegisterU16::AF => (&mut self.a, &mut self.f),
+            RegisterU16::AF => (&mut self.a, &mut self.flag_register.value),
             RegisterU16::BC => (&mut self.b, &mut self.c),
             RegisterU16::DE => (&mut self.d, &mut self.e),
             RegisterU16::HL => (&mut self.h, &mut self.l),
         };
         RegisterPair { high, low }
+    }
+
+    fn resolve_u16_reg_immutable(&self, reg: &RegisterU16) -> ImmutableRegisterPair {
+        let (high, low) = match reg {
+            RegisterU16::AF => (&self.a, &self.flag_register.value),
+            RegisterU16::BC => (&self.b, &self.c),
+            RegisterU16::DE => (&self.d, &self.e),
+            RegisterU16::HL => (&self.h, &self.l),
+        };
+        ImmutableRegisterPair { high, low }
     }
 
     fn read_u8_target(&mut self, target: LoadSrcU8) -> u8 {
@@ -414,9 +480,12 @@ impl CPU {
             }
         };
 
-        self.flags.z = result == 0;
-        self.flags.n = false;
-        self.flags.h = (result & 0x0F) == 0x00;
+        self.apply_flag_change(FlagChange {
+            z: Some(result == 0),
+            n: Some(false),
+            h: Some((result & 0x0F) == 0x00),
+            c: None,
+        });
     }
 
     fn inc_u16(&mut self, target: U16Target) {
@@ -447,9 +516,12 @@ impl CPU {
             }
         };
 
-        self.flags.z = result == 0;
-        self.flags.n = true;
-        self.flags.h = (result & 0x0F) == 0x0F;
+        self.apply_flag_change(FlagChange {
+            z: Some(result == 0),
+            n: Some(true),
+            h: Some((result & 0x0F) == 0x0F),
+            c: None,
+        });
     }
 
     fn dec_u16(&mut self, target: U16Target) {
@@ -470,10 +542,12 @@ impl CPU {
 
         self.a = self.a | value;
 
-        self.flags.z = self.a == 0;
-        self.flags.n = false;
-        self.flags.h = false;
-        self.flags.c = false;
+        self.apply_flag_change(FlagChange {
+            z: Some(self.a == 0),
+            n: Some(false),
+            h: Some(false),
+            c: Some(false),
+        })
     }
 
     fn and(&mut self, target: LogicalOpTarget) {
@@ -481,10 +555,12 @@ impl CPU {
 
         self.a = self.a & value;
 
-        self.flags.z = self.a == 0;
-        self.flags.n = false;
-        self.flags.h = true;
-        self.flags.c = false;
+        self.apply_flag_change(FlagChange {
+            z: Some(self.a == 0),
+            n: Some(false),
+            h: Some(true),
+            c: Some(false),
+        })
     }
 
     fn xor(&mut self, target: LogicalOpTarget) {
@@ -492,10 +568,12 @@ impl CPU {
 
         self.a = self.a ^ value;
 
-        self.flags.z = self.a == 0;
-        self.flags.n = false;
-        self.flags.h = false;
-        self.flags.c = false;
+        self.apply_flag_change(FlagChange {
+            z: Some(self.a == 0),
+            n: Some(false),
+            h: Some(true),
+            c: Some(false),
+        })
     }
 
     fn add_u8(&mut self, target: LogicalOpTarget) {
@@ -507,10 +585,12 @@ impl CPU {
 
         self.a = result as u8;
 
-        self.flags.z = self.a == 0;
-        self.flags.n = false;
-        self.flags.h = half_carry;
-        self.flags.c = result > 0xFF;
+        self.apply_flag_change(FlagChange {
+            z: Some(self.a == 0),
+            n: Some(false),
+            h: Some(half_carry),
+            c: Some(result > 0xFF),
+        });
     }
 
     fn add_u16(&mut self, target: U16Target) {
@@ -523,24 +603,29 @@ impl CPU {
 
         self.resolve_u16_reg(&RegisterU16::HL).set(result as u16);
 
-        self.flags.n = false;
-        self.flags.h = (hl & 0xFFF) + (rhs & 0xFFF) > 0xFFF;
-        self.flags.c = result > 0xFFFF;
+        self.apply_flag_change(FlagChange {
+            z: None,
+            n: Some(false),
+            h: Some((hl & 0xFFF) + (rhs & 0xFFF) > 0xFFF),
+            c: Some(result > 0xFFFF),
+        });
     }
 
     fn adc(&mut self, target: LogicalOpTarget) {
         let value = self.resolve_logical_op_target(target);
-        let carry_value: u8 = if self.flags.c { 1 } else { 0 };
+        let carry_value: u8 = if self.flag_register.get_c() { 1 } else { 0 };
 
         let half_carry = (self.a & 0xF) + (value & 0xF) + carry_value > 0xF;
         let result = (self.a as u16) + (value as u16) + (carry_value as u16);
 
         self.a = result as u8;
 
-        self.flags.z = self.a == 0;
-        self.flags.n = false;
-        self.flags.h = half_carry;
-        self.flags.c = result > 0xFF;
+        self.apply_flag_change(FlagChange {
+            z: Some(self.a == 0),
+            n: Some(false),
+            h: Some(half_carry),
+            c: Some(result > 0xFF),
+        });
     }
 
     fn sub(&mut self, target: LogicalOpTarget) {
@@ -551,10 +636,12 @@ impl CPU {
 
         self.a = self.a.wrapping_sub(value);
 
-        self.flags.z = self.a == 0;
-        self.flags.n = true;
-        self.flags.h = half_carry;
-        self.flags.c = carry;
+        self.apply_flag_change(FlagChange {
+            z: Some(self.a == 0),
+            n: Some(true),
+            h: Some(half_carry),
+            c: Some(carry),
+        });
     }
 
     fn add_stackpointer_immediate(&mut self) {
@@ -566,10 +653,12 @@ impl CPU {
 
         let signed_mask = 0xFFFF as u16 as i16;
 
-        self.flags.z = false;
-        self.flags.n = false;
-        self.flags.h = ((signed_sp ^ offset ^ (result & signed_mask)) & 0x10) == 0x10;
-        self.flags.c = ((signed_sp ^ offset ^ (result & signed_mask)) & 0x100) == 0x100;
+        self.apply_flag_change(FlagChange {
+            z: Some(false),
+            n: Some(false),
+            h: Some(((signed_sp ^ offset ^ (result & signed_mask)) & 0x10) == 0x10),
+            c: Some(((signed_sp ^ offset ^ (result & signed_mask)) & 0x100) == 0x100),
+        });
     }
 
     fn compare(&mut self, target: LogicalOpTarget) {
@@ -580,15 +669,17 @@ impl CPU {
         let nibble_a = self.a & 0xF;
         let nibble_value = self.a & 0xF;
 
-        self.flags.z = result == 0;
-        self.flags.n = true;
-        self.flags.h = nibble_a < nibble_value;
-        self.flags.c = self.a < value;
+        self.apply_flag_change(FlagChange {
+            z: Some(result == 0),
+            n: Some(true),
+            h: Some(nibble_a < nibble_value),
+            c: Some(self.a < value),
+        });
     }
 
     fn rra(&mut self) {
         self.rr(CbTarget::Register(RegisterU8::A));
-        self.flags.z = false;
+        self.flag_register.set_z(false);
     }
 
     fn srl(&mut self, target: CbTarget) {
@@ -607,7 +698,7 @@ impl CPU {
     }
 
     fn rr(&mut self, target: CbTarget) {
-        let old_carry = self.flags.c;
+        let old_carry = self.flag_register.get_c();
 
         self.apply_cb_target(target, |value| {
             let new_carry = value & 0x1 != 0;
@@ -683,19 +774,19 @@ impl CPU {
 
     fn apply_flag_change(&mut self, flag_change: FlagChange) {
         if let Some(z) = flag_change.z {
-            self.flags.z = z;
+            self.flag_register.set_z(z);
         }
 
         if let Some(n) = flag_change.n {
-            self.flags.n = n;
+            self.flag_register.set_n(n);
         }
 
         if let Some(h) = flag_change.h {
-            self.flags.h = h;
+            self.flag_register.set_h(h);
         }
 
         if let Some(c) = flag_change.c {
-            self.flags.c = c;
+            self.flag_register.set_c(c);
         }
     }
 
@@ -716,10 +807,10 @@ impl CPU {
             return true;
         }
         match condition.unwrap() {
-            FlagCondition::Z => self.flags.z,
-            FlagCondition::NZ => !self.flags.z,
-            FlagCondition::C => self.flags.c,
-            FlagCondition::NC => !self.flags.c,
+            FlagCondition::Z => self.flag_register.get_z(),
+            FlagCondition::NZ => !self.flag_register.get_z(),
+            FlagCondition::C => self.flag_register.get_c(),
+            FlagCondition::NC => !self.flag_register.get_c(),
         }
     }
 
@@ -735,10 +826,35 @@ fn swap_nibbles(value: u8) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_swap_nibbles() {
         assert_eq!(swap_nibbles(0xAB), 0xBA);
         assert_eq!(swap_nibbles(0x0F), 0xF0);
         assert_eq!(swap_nibbles(0xF0), 0x0F);
+    }
+
+    #[test]
+    fn test_get_bit() {
+        assert_eq!(get_bit(0b1011_0010, 0), false);
+        assert_eq!(get_bit(0b1011_0010, 1), true);
+        assert_eq!(get_bit(0b1011_0010, 2), false);
+        assert_eq!(get_bit(0b1011_0010, 3), false);
+        assert_eq!(get_bit(0b1011_0010, 4), true);
+        assert_eq!(get_bit(0b1011_0010, 5), true);
+        assert_eq!(get_bit(0b1011_0010, 6), false);
+        assert_eq!(get_bit(0b1011_0010, 7), true);
+    }
+
+    #[test]
+    fn test_set_bit() {
+        assert_eq!(set_bit(0b1011_0010, 0, true), 0b1011_0011);
+        assert_eq!(set_bit(0b1011_0010, 1, false), 0b1011_0000);
+        assert_eq!(set_bit(0b1011_0010, 2, false), 0b1011_0010);
+        assert_eq!(set_bit(0b1011_0010, 3, true), 0b1011_1010);
+        assert_eq!(set_bit(0b1011_0010, 4, false), 0b1010_0010);
+        assert_eq!(set_bit(0b1011_0010, 5, true), 0b1011_0010);
+        assert_eq!(set_bit(0b1011_0010, 6, true), 0b1111_0010);
+        assert_eq!(set_bit(0b1011_0010, 7, false), 0b0011_0010);
     }
 }
