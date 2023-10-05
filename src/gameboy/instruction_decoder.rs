@@ -549,6 +549,7 @@ pub fn decode_cb(opcode: u8) -> Option<Instruction> {
         0x38..=0x3F => Instruction::CbSrl(target),
         0x30..=0x37 => Instruction::CbSwap(target),
         0x40..=0x47 => Instruction::CbBit { n: 0, target, },
+        0x70..=0x7C => Instruction::CbBit { n: 6, target, },
         _ => return None,
     })
 }
