@@ -116,6 +116,7 @@ pub enum Instruction {
     Sub(LogicalOpTarget),
     CbSrl(CbTarget),
     CbRr(CbTarget),
+    CbRl(CbTarget),
     CbBit { n: u8, target: CbTarget },
     CbSwap(CbTarget),
     Rra,
@@ -545,6 +546,7 @@ fn resolve_cb_target(col: u8) -> CbTarget {
 pub fn decode_cb(opcode: u8) -> Option<Instruction> {
     let target = resolve_cb_target(opcode & 0xF);
     Some(match opcode {
+        0x10..=0x17 => Instruction::CbRl(target),
         0x18..=0x1F => Instruction::CbRr(target),
         0x38..=0x3F => Instruction::CbSrl(target),
         0x30..=0x37 => Instruction::CbSwap(target),

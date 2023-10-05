@@ -247,6 +247,7 @@ impl CPU {
             Instruction::Sub(target) => self.sub(target),
             Instruction::CbSrl(target) => self.srl(target),
             Instruction::CbRr(target) => self.rr(target),
+            Instruction::CbRl(target) => self.rl(target),
             Instruction::Rra => self.rra(),
             Instruction::CbBit { n, target } => self.bit(n, target),
             Instruction::Adc(target) => self.adc(target),
@@ -701,12 +702,33 @@ impl CPU {
         let old_carry = self.flag_register.get_c();
 
         self.apply_cb_target(target, |value| {
-            let new_carry = value & 0x1 != 0;
+            let new_carry = get_bit(value, 0);
 
             let result = if old_carry {
                 (value >> 1) | (1 << 7)
             } else {
                 value >> 1
+            };
+
+            return (Some(result), FlagChange {
+                z: Some(result == 0),
+                n: Some(false),
+                h: Some(false),
+                c: Some(new_carry),
+            });
+        });
+    }
+
+    fn rl(&mut self, target: CbTarget) {
+        let old_carry = self.flag_register.get_c();
+
+        self.apply_cb_target(target, |value| {
+            let new_carry = get_bit(value, 7);
+
+            let result = if old_carry {
+                (value << 1) | 1
+            } else {
+                value << 1
             };
 
             return (Some(result), FlagChange {
