@@ -186,7 +186,6 @@ fn verify_state(
 impl CPU {
     pub fn new(cartridge: Box<dyn Cartridge>) -> CPU {
         CPU {
-            pc: 0x0100,
             pc: 0x0000,
             sp: 0x0FFFE,
             mmu: MMU::new(cartridge),
