@@ -49,8 +49,8 @@ fn main() -> ! {
         } else {
             None
         };
-        let should_continue = cpu.tick(current_metadata, index);
-        if !should_continue {
+        let maybe_cycles = cpu.tick(current_metadata, index);
+        if maybe_cycles.is_none() {
             todo!("HALT!")
         }
         index += 1;

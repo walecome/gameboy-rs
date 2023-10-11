@@ -6,3 +6,4 @@ pub mod instruction_decoder;
 pub mod mmu;
 pub mod reference;
 pub mod video;
+pub mod cycles;

@@ -13,6 +13,8 @@ use super::address::Address;
 
 use super::reference::ReferenceMetadata;
 
+use super::cycles;
+
 struct RegisterPair<'a> {
     high: &'a mut u8,
     low: &'a mut u8,
@@ -138,6 +140,7 @@ pub struct CPU {
     l: u8,
     interrupts_enabled: bool,
     flag_register: FlagRegister,
+    did_take_conditional_branch: bool,
 
     // Debug
     depth: usize,
@@ -183,6 +186,11 @@ fn verify_state(
     }
 }
 
+enum OpcodeType {
+    Normal,
+    Cb,
+}
+
 impl CPU {
     pub fn new(cartridge: Box<dyn Cartridge>) -> CPU {
         CPU {
@@ -198,18 +206,17 @@ impl CPU {
             l: 0x00,
             interrupts_enabled: false,
             flag_register: FlagRegister::new(),
+            did_take_conditional_branch: false,
             depth: 0,
         }
     }
-    pub fn tick(&mut self, maybe_metadata: Option<&ReferenceMetadata>, i: usize) -> bool {
+
+    pub fn tick(&mut self, maybe_metadata: Option<&ReferenceMetadata>, i: usize) -> Option<u8> {
+        self.did_take_conditional_branch = false;
+
         let pc = self.pc;
-        let opcode = self.read_u8();
-        let instruction = if opcode == 0xCB {
-            let cb_opcode = self.read_u8();
-            decode_cb(cb_opcode).expect(format!("Unknown CB opcode: {:#06X}: {:#04X}", pc, cb_opcode).as_str())
-        } else {
-            decode(opcode).expect(format!("Unknown opcode: {:#06X}: {:#04X}", pc, opcode).as_str())
-        };
+        let (instruction, opcode_type, opcode) = self.next_instruction();
+
         print!("{:.<1$}", "", 1 * self.depth);
         println!("{:#06X}: {:#04X} ({:?})", pc, opcode, instruction);
 
@@ -221,7 +228,7 @@ impl CPU {
                 let value = self.read_u8_target(src);
                 self.write_u8_target(dst, value);
             }
-            Instruction::Halt => return false,
+            Instruction::Halt => return None,
             Instruction::JumpImmediate(condition) => self.jump_immediate(condition),
             Instruction::DisableInterrupts => self.interrupts_enabled = false,
             Instruction::LoadU16 { dst, src } => {
@@ -262,7 +269,26 @@ impl CPU {
             Instruction::CbSwap(target) => self.swap(target),
         }
 
-        return true;
+        return Some(match (self.did_take_conditional_branch, opcode_type) {
+            (false, OpcodeType::Normal) => cycles::NORMAL_OPCODE_CYCLES[opcode as usize],
+            (false, OpcodeType::Cb) => cycles::CB_OPCODE_CYCLES[opcode as usize],
+            (true, OpcodeType::Normal) => cycles::NORMAL_OPCODE_CYCLES_BRANCED[opcode as usize],
+            (true, OpcodeType::Cb) => unreachable!("CB opcodes shouldn't branch"),
+        });
+    }
+
+    fn next_instruction(&mut self) -> (Instruction, OpcodeType, u8) {
+        let pc = self.pc;
+        let opcode = self.read_u8();
+        let is_cb_opcode = opcode == 0xCB;
+        if is_cb_opcode {
+            let cb_opcode = self.read_u8();
+            let decoded = decode_cb(cb_opcode).expect(format!("Unknown CB opcode: {:#06X}: {:#04X}", pc, cb_opcode).as_str());
+            return (decoded, OpcodeType::Cb, cb_opcode);
+        }
+
+        let decoded = decode(opcode).expect(format!("Unknown opcode: {:#06X}: {:#04X}", pc, opcode).as_str());
+        return (decoded, OpcodeType::Normal, opcode);
     }
 
     fn next_pc(&mut self) -> u16 {
@@ -829,17 +855,19 @@ impl CPU {
         }
     }
 
-    fn is_flag_condition_true(&self, condition: Option<FlagCondition>) -> bool {
+    fn is_flag_condition_true(&mut self, condition: Option<FlagCondition>) -> bool {
         // No condition is always true
         if condition.is_none() {
             return true;
         }
-        match condition.unwrap() {
+        let is_condition_true = match condition.unwrap() {
             FlagCondition::Z => self.flag_register.get_z(),
             FlagCondition::NZ => !self.flag_register.get_z(),
             FlagCondition::C => self.flag_register.get_c(),
             FlagCondition::NC => !self.flag_register.get_c(),
-        }
+        };
+        self.did_take_conditional_branch = is_condition_true;
+        return is_condition_true;
     }
 
     fn hl(&mut self) -> u16 {
