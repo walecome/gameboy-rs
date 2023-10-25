@@ -10,6 +10,7 @@ use super::instruction_decoder::{
 
 use super::mmu::{MMU, Word};
 use super::address::Address;
+use super::utils::{get_bit, set_bit};
 
 use super::reference::ReferenceMetadata;
 
@@ -58,18 +59,6 @@ struct FlagDebug {
 
 pub struct FlagRegister {
     value: u8,
-}
-
-fn get_bit(value: u8, bit: u8) -> bool {
-    value & (1 << bit) != 0
-}
-
-fn set_bit(value: u8, bit: u8, bit_value: bool) -> u8 {
-    if bit_value {
-        value | (1 << bit)
-    } else {
-        value & !(1 << bit)
-    }
 }
 
 impl FlagRegister {
@@ -275,6 +264,10 @@ impl CPU {
             (true, OpcodeType::Normal) => cycles::NORMAL_OPCODE_CYCLES_BRANCED[opcode as usize],
             (true, OpcodeType::Cb) => unreachable!("CB opcodes shouldn't branch"),
         });
+    }
+
+    pub fn mmu(&mut self) -> &mut MMU {
+        &mut self.mmu
     }
 
     fn next_instruction(&mut self) -> (Instruction, OpcodeType, u8) {

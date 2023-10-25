@@ -107,6 +107,10 @@ impl MMU {
         }
     }
 
+    pub fn video(&mut self) -> &mut Video {
+        &mut self.video
+    }
+
     pub fn read(&self, address: Address) -> u8 {
         if address.value() == 0xFF0F {
             return self.interrupt_flags;
@@ -120,7 +124,7 @@ impl MMU {
                     self.cartridge.read(address)
                 }
             }
-            0x8000..=0x9FFF => todo!("Read VRAM"),
+            0x8000..=0x9FFF => self.video.read_vram(Address::new(address.value() - 0x8000)),
             0xA000..=0xBFFF => todo!("Read from cartridge RAM"),
             0xC000..=0xDFFF => self.internal_ram[address.index_value() - 0xC000],
             0xE000..=0xFDFF => panic!("Read access for prohibited memory area"),
@@ -179,7 +183,7 @@ impl MMU {
             0x04..=0x07 => self.io.timer_and_divider[(select_byte - 0x04) as usize],
             0x10..=0x26 => self.io.audio[(select_byte - 0x10) as usize],
             0x30..=0x3F => self.io.wave_pattern[(select_byte - 0x30) as usize],
-            0x40..=0x4B => self.video.lcd().read(select_byte),
+            0x40..=0x4B => self.video.read_register(select_byte),
             0x4F => self.io.vram_bank_select,
             0x50 => self.io.boot_rom_disabled,
             0x51..=0x55 => self.io.vram_dma[(select_byte - 0x51) as usize],
@@ -202,7 +206,7 @@ impl MMU {
             0x04..=0x07 => self.io.timer_and_divider[(select_byte - 0x04) as usize] = value,
             0x10..=0x26 => self.io.audio[(select_byte - 0x10) as usize] = value,
             0x30..=0x3F => self.io.wave_pattern[(select_byte - 0x30) as usize] = value,
-            0x40..=0x4B => self.video.lcd_mut().write(select_byte, value),
+            0x40..=0x4B => self.video.write_register(select_byte, value),
             0x4F => self.io.vram_bank_select = value,
             0x50 => self.io.boot_rom_disabled = value,
             0x51..=0x55 => self.io.vram_dma[(select_byte - 0x51) as usize] = value,

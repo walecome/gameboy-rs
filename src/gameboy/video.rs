@@ -1,4 +1,5 @@
 use super::address::Address;
+use super::utils::{get_bit, set_bit_mut};
 
 const DOTS_PER_LINE: usize = 456;
 const DOTS_PER_FRAME: usize = 70224;
@@ -10,117 +11,161 @@ struct Point {
     y: usize,
 }
 
-pub struct Lcd {
-    scy: u8,
-    scx: u8,
-}
-
-impl Lcd {
-    fn new() -> Self {
-        Self { scy: 0, scx: 0 }
-    }
-
-    pub fn read(&self, _select_byte: u8) -> u8 {
-        todo!();
-    }
-
-    pub fn write(&mut self, _select_byte: u8, _value: u8) {
-        todo!();
-    }
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 enum VideoMode {
-    OamScan,
-    DrawPixels,
-    HorizontalBlank,
-    VerticalBlank,
+    Mode2OamScan = 2,
+    Mode3DrawPixels = 3,
+    Mode0HorizontalBlank = 0,
+    Mode1VerticalBlank = 1,
+}
+
+struct LcdStatus {
+    data: u8,
+    ppu_mode: VideoMode,
+}
+
+enum LcdStatusBit {
+    LyCompare = 2,
+    Mode0IntSelect = 3,
+    Mode1IntSelect = 4,
+    Mode2IntSelect = 5,
+    LycIntSelect = 6,
+}
+
+impl LcdStatus {
+    fn new() -> Self {
+        Self {
+            data: 0,
+            ppu_mode: VideoMode::Mode2OamScan,
+        }
+    }
+
+    fn get_field(&mut self, bit: LcdStatusBit) -> bool {
+        get_bit(self.data, bit as u8)
+    }
+
+    fn get_ppu_mode(&self) -> VideoMode {
+        self.ppu_mode
+    }
+
+    fn set_ppu_mode(&mut self, mode: VideoMode) {
+        self.ppu_mode = mode;
+    }
+
+    fn set_lyc_condition(&mut self, lyc_is_ly: bool) {
+        set_bit_mut(&mut self.data, LcdStatusBit::LyCompare as u8, lyc_is_ly)
+    }
+
+    fn read_as_byte(&self) -> u8 {
+        return self.data | self.ppu_mode as u8
+    }
+
+    fn write_as_byte(&mut self, value: u8) {
+        // Only bits 3 to 6 are writable
+        let masked_value = value & 0b0111_1000;
+        self.data = masked_value;
+    }
 }
 
 pub struct Video {
     vram: Vec<u8>,
-    current_mode: VideoMode,
-    ly: usize,
+    lyc: u8,
+
+    lcd_status: LcdStatus,
+
+    // internal
     current_dot: usize,
-    lcd: Lcd,
 }
 
 impl Video {
     pub fn new() -> Self {
         Self {
             vram: vec![0x00; 0x4000],
-            current_mode: VideoMode::OamScan,
-            ly: 0,
+            lcd_status: LcdStatus::new(),
+            lyc: 0,
             current_dot: 0,
-            lcd: Lcd::new(),
         }
     }
 
     pub fn tick(&mut self, elapsed_cycles: usize) {
         self.current_dot += elapsed_cycles;
 
-        let next_mode = if let Some(mode) = self.get_mode_transition() {
-            mode
-        } else {
+        if !self.is_current_mode_ending() {
             return;
-        };
-
-        match next_mode {
-            VideoMode::OamScan => {
-                assert_eq!(self.current_mode, VideoMode::VerticalBlank);
-                // TODO: Implement
-            },
-            VideoMode::DrawPixels => {
-                assert_eq!(self.current_mode, VideoMode::OamScan);
-                // TODO: Implement
-            },
-            VideoMode::HorizontalBlank => {
-                assert_eq!(self.current_mode, VideoMode::DrawPixels);
-                // TODO: Implement
-            },
-            VideoMode::VerticalBlank => {
-                assert_eq!(self.current_mode, VideoMode::HorizontalBlank);
-                // TODO: Implement
-            },
         }
 
-        self.current_mode = next_mode;
+        let point = self.current_point();
+
+        // TODO: Should this only be set after drawing pixels?
+        let lyc_is_ly = point.y as u8 == self.lyc;
+        self.lcd_status.set_lyc_condition(lyc_is_ly);
+        if lyc_is_ly && self.lcd_status.get_field(LcdStatusBit::LycIntSelect) {
+            todo!("Trigger STAT interrupt");
+        }
+
+        let previous_mode = self.lcd_status.get_ppu_mode();
+
+        let next_mode = match previous_mode {
+            VideoMode::Mode2OamScan => VideoMode::Mode3DrawPixels,
+            VideoMode::Mode3DrawPixels => VideoMode::Mode0HorizontalBlank,
+            VideoMode::Mode0HorizontalBlank => {
+                if point.y >= 144 {
+                    VideoMode::Mode1VerticalBlank
+                } else {
+                    VideoMode::Mode2OamScan
+                }
+            }
+            VideoMode::Mode1VerticalBlank => VideoMode::Mode2OamScan,
+        };
+
+        self.lcd_status.set_ppu_mode(next_mode);
+
+        match next_mode {
+            VideoMode::Mode2OamScan => {
+                if self.lcd_status.get_field(LcdStatusBit::Mode2IntSelect) {
+                    todo!("Trigger STAT interrupt");
+                }
+            },
+
+            VideoMode::Mode3DrawPixels => {
+
+            },
+
+            VideoMode::Mode0HorizontalBlank => {
+                if self.lcd_status.get_field(LcdStatusBit::Mode0IntSelect) {
+                    todo!("Trigger STAT interrupt");
+                }
+            },
+
+            VideoMode::Mode1VerticalBlank => {
+                if self.lcd_status.get_field(LcdStatusBit::Mode1IntSelect) {
+                    todo!("Trigger STAT interrupt");
+                }
+            },
+        }
     }
 
-    fn get_mode_transition(&mut self) -> Option<VideoMode> {
+    fn is_current_mode_ending(&self) -> bool {
         let point = self.current_point();
-        Some(match self.current_mode {
-            VideoMode::OamScan => {
-                if point.x < DOTS_OAM_SCAN {
-                    return None;
-                }
-                VideoMode::OamScan
-            },
 
-            VideoMode::DrawPixels => {
+        return match self.lcd_status.get_ppu_mode() {
+            VideoMode::Mode2OamScan => point.x >= DOTS_OAM_SCAN,
+
+            VideoMode::Mode3DrawPixels => {
                 // TODO: Calculate MODE 3 penalty
                 let elapsed_draw_pixels = point.x - DOTS_OAM_SCAN;
-                if elapsed_draw_pixels < MIN_DOTS_DRAW_PIXELS {
-                    return None
-                }
-                VideoMode::DrawPixels
+                elapsed_draw_pixels >= MIN_DOTS_DRAW_PIXELS
             },
 
-            VideoMode::HorizontalBlank => {
+            VideoMode::Mode0HorizontalBlank => {
                 assert!(point.y <= 144);
-                if point.y != 144 {
-                    return None
-                }
-                VideoMode::VerticalBlank
+                point.y >= 144
             },
 
-            VideoMode::VerticalBlank => {
-                if self.current_dot < DOTS_PER_FRAME {
-                    return None
-                }
-                VideoMode::OamScan
+            VideoMode::Mode1VerticalBlank => {
+                self.current_dot >= DOTS_PER_FRAME
             },
-        })
+        }
     }
 
     pub fn write_vram(&mut self, address: Address, value: u8) {
@@ -131,12 +176,22 @@ impl Video {
         self.vram[address.index_value()]
     }
 
-    pub fn lcd_mut(&mut self) -> &mut Lcd {
-        &mut self.lcd
+    pub fn read_register(&self, select_byte: u8) -> u8 {
+        match select_byte {
+            0x41 => self.lcd_status.read_as_byte(),
+            0x44 => self.current_point().y as u8,
+            0x45 => self.lyc,
+            _ => todo!()
+        }
     }
 
-    pub fn lcd(&self) -> &Lcd {
-        &self.lcd
+    pub fn write_register(&mut self, select_byte: u8, value: u8) {
+        match select_byte {
+            0x41 => self.lcd_status.write_as_byte(value),
+            0x44 => panic!("Trying to write to LY"),
+            0x45 => self.lyc = value,
+            _ => todo!(),
+        }
     }
 
     fn current_point(&self) -> Point {

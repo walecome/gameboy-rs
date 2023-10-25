@@ -50,8 +50,13 @@ fn main() -> ! {
             None
         };
         let maybe_cycles = cpu.tick(current_metadata, index);
-        if maybe_cycles.is_none() {
-            todo!("HALT!")
+        match maybe_cycles {
+            Some(cycles) => {
+                cpu.mmu().video().tick(cycles as usize);
+            },
+            None => {
+                todo!("HALT!")
+            }
         }
         index += 1;
     }
