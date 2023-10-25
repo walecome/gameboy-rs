@@ -67,11 +67,39 @@ impl LcdStatus {
     }
 }
 
+struct LcdControl {
+    data: u8,
+}
+
+enum LcdControlBit {
+    BgWindowEnablePriority = 0,
+    ObjEnable = 1,
+    ObjSize = 2,
+    BgTileMap = 3,
+    BgAndWindowTiles = 4,
+    WindowEnable = 5,
+    WindowTileMap = 6,
+    LcdAndPpuEnable = 7,
+}
+
+impl LcdControl {
+    fn new() -> Self {
+        Self {
+            data: 0,
+        }
+    }
+
+    fn get_field(&self, field: LcdControlBit) -> bool {
+        get_bit(self.data, field as u8)
+    }
+}
+
 pub struct Video {
     vram: Vec<u8>,
     lyc: u8,
 
     lcd_status: LcdStatus,
+    lcd_control: LcdControl,
 
     // internal
     current_dot: usize,
@@ -82,6 +110,7 @@ impl Video {
         Self {
             vram: vec![0x00; 0x4000],
             lcd_status: LcdStatus::new(),
+            lcd_control: LcdControl::new(),
             lyc: 0,
             current_dot: 0,
         }
@@ -178,6 +207,7 @@ impl Video {
 
     pub fn read_register(&self, select_byte: u8) -> u8 {
         match select_byte {
+            0x40 => self.lcd_control.data,
             0x41 => self.lcd_status.read_as_byte(),
             0x44 => self.current_point().y as u8,
             0x45 => self.lyc,
@@ -187,6 +217,7 @@ impl Video {
 
     pub fn write_register(&mut self, select_byte: u8, value: u8) {
         match select_byte {
+            0x40 => self.lcd_control.data = value,
             0x41 => self.lcd_status.write_as_byte(value),
             0x44 => panic!("Trying to write to LY"),
             0x45 => self.lyc = value,
