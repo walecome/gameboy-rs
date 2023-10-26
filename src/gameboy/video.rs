@@ -157,6 +157,8 @@ pub struct Video {
     bg_palette: Palette,
     obj_palette_0: Palette,
     obj_palette_1: Palette,
+    window_y: u8,
+    window_x: u8,
 
     // internal
     current_dot: usize,
@@ -175,6 +177,8 @@ impl Video {
             bg_palette: Palette::new(),
             obj_palette_0: Palette::new(),
             obj_palette_1: Palette::new(),
+            window_y: 0,
+            window_x: 0,
         }
     }
 
@@ -279,6 +283,8 @@ impl Video {
             0x47 => self.bg_palette.read_as_byte(),
             0x48 => self.obj_palette_0.read_as_byte(),
             0x49 => self.obj_palette_1.read_as_byte(),
+            0x4A => self.window_y,
+            0x4B => self.window_x,
             _ => todo!()
         }
     }
@@ -295,6 +301,8 @@ impl Video {
             0x47 => self.bg_palette.write_as_byte(value),
             0x48 => self.obj_palette_0.write_as_byte(value),
             0x49 => self.obj_palette_1.write_as_byte(value),
+            0x4A => self.window_y = value,
+            0x4B => self.window_x = value,
             _ => todo!(),
         }
     }
