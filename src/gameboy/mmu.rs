@@ -183,7 +183,9 @@ impl MMU {
             0x04..=0x07 => self.io.timer_and_divider[(select_byte - 0x04) as usize],
             0x10..=0x26 => self.io.audio[(select_byte - 0x10) as usize],
             0x30..=0x3F => self.io.wave_pattern[(select_byte - 0x30) as usize],
-            0x40..=0x4B => self.video.read_register(select_byte),
+            0x40..=0x45 => self.video.read_register(select_byte),
+            0x46 => panic!("Reading from DMA transfer register"),
+            0x47..=0x4B => self.video.read_register(select_byte),
             0x4F => self.io.vram_bank_select,
             0x50 => self.io.boot_rom_disabled,
             0x51..=0x55 => self.io.vram_dma[(select_byte - 0x51) as usize],
@@ -206,7 +208,9 @@ impl MMU {
             0x04..=0x07 => self.io.timer_and_divider[(select_byte - 0x04) as usize] = value,
             0x10..=0x26 => self.io.audio[(select_byte - 0x10) as usize] = value,
             0x30..=0x3F => self.io.wave_pattern[(select_byte - 0x30) as usize] = value,
-            0x40..=0x4B => self.video.write_register(select_byte, value),
+            0x40..=0x45 => self.video.write_register(select_byte, value),
+            0x46 => self.do_dma_transfer(value),
+            0x47..=0x4B => self.video.write_register(select_byte, value),
             0x4F => self.io.vram_bank_select = value,
             0x50 => self.io.boot_rom_disabled = value,
             0x51..=0x55 => self.io.vram_dma[(select_byte - 0x51) as usize] = value,
@@ -214,5 +218,21 @@ impl MMU {
             0x70 => self.io.wram_bank_select = value,
             _ => panic!("Write for unmapped IO address: {:#06X}", address.value()),
         };
+    }
+
+    fn do_dma_transfer(&mut self, dma_target: u8) {
+        // TODO: The DMA transfer could take 160 cycle for normal speed, do we need to care?
+        // https://gbdev.io/pandocs/OAM_DMA_Transfer.html#ff46--dma-oam-dma-source-address--start
+        let mut src_addr = Address::new((dma_target as u16) * 0x0100);
+        let mut dst_addr = Address::new(0xFE00);
+        for _ in 0..=0x9F {
+
+            let value = self.read(src_addr);
+            self.write(dst_addr, value);
+
+            src_addr = src_addr.next();
+            dst_addr = dst_addr.next();
+        }
+
     }
 }

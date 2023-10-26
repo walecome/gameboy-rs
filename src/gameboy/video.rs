@@ -94,12 +94,62 @@ impl LcdControl {
     }
 }
 
+#[derive(Copy, Clone)]
+enum BgColor {
+    White = 0,
+    LightGray = 1,
+    DarkGray = 2,
+    Black = 3,
+}
+
+struct BgPalette {
+    id0: BgColor,
+    id1: BgColor,
+    id2: BgColor,
+    id3: BgColor,
+}
+
+fn map_bg_color(value: u8) -> BgColor {
+    match value {
+        0 => BgColor::White,
+        1 => BgColor::LightGray,
+        2 => BgColor::DarkGray,
+        3 => BgColor::Black,
+        _ => panic!("Invalid bg color"),
+    }
+}
+
+impl BgPalette {
+    fn new() -> Self {
+        Self {
+            id0: BgColor::White,
+            id1: BgColor::White,
+            id2: BgColor::White,
+            id3: BgColor::White,
+        }
+    }
+
+    fn write_as_byte(&mut self, value: u8) {
+        self.id0 = map_bg_color((value & 0b0000_0011) >> 0);
+        self.id1 = map_bg_color((value & 0b0000_1100) >> 2);
+        self.id2 = map_bg_color((value & 0b0011_0000) >> 4);
+        self.id3 = map_bg_color((value & 0b1100_0000) >> 6);
+    }
+
+    fn read_as_byte(&self) -> u8 {
+        ((self.id3 as u8) << 6) | ((self.id2 as u8) << 4) | ((self.id1 as u8) << 2) | self.id0 as u8
+    }
+}
+
 pub struct Video {
     vram: Vec<u8>,
     lyc: u8,
 
     lcd_status: LcdStatus,
     lcd_control: LcdControl,
+    scy: u8,
+    scx: u8,
+    bg_palette: BgPalette,
 
     // internal
     current_dot: usize,
@@ -113,6 +163,9 @@ impl Video {
             lcd_control: LcdControl::new(),
             lyc: 0,
             current_dot: 0,
+            scy: 0,
+            scx: 0,
+            bg_palette: BgPalette::new(),
         }
     }
 
@@ -209,8 +262,12 @@ impl Video {
         match select_byte {
             0x40 => self.lcd_control.data,
             0x41 => self.lcd_status.read_as_byte(),
+            0x42 => self.scy,
+            0x43 => self.scx,
             0x44 => self.current_point().y as u8,
             0x45 => self.lyc,
+            0x46 => panic!("Should be handled by MMU"),
+            0x47 => self.bg_palette.read_as_byte(),
             _ => todo!()
         }
     }
@@ -219,8 +276,12 @@ impl Video {
         match select_byte {
             0x40 => self.lcd_control.data = value,
             0x41 => self.lcd_status.write_as_byte(value),
+            0x42 => self.scy = value,
+            0x43 => self.scx = value,
             0x44 => panic!("Trying to write to LY"),
             0x45 => self.lyc = value,
+            0x46 => panic!("Should be handled by MMU"),
+            0x47 => self.bg_palette.write_as_byte(value),
             _ => todo!(),
         }
     }
