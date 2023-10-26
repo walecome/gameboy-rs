@@ -52,11 +52,7 @@ pub struct IO {
     timer_and_divider: Vec<u8>,
     audio: Vec<u8>,
     wave_pattern: Vec<u8>,
-    vram_bank_select: u8,
     boot_rom_disabled: u8,
-    vram_dma: Vec<u8>,
-    bg_obj_palettes: Vec<u8>,
-    wram_bank_select: u8,
 }
 
 fn byte_vec_for_range(
@@ -75,11 +71,7 @@ impl IO {
             timer_and_divider: byte_vec_for_range(0xFF00, 0xFF07),
             audio: byte_vec_for_range(0xFF10, 0xFF26),
             wave_pattern: byte_vec_for_range(0xFF30, 0xFF3F),
-            vram_bank_select: 0x00,
             boot_rom_disabled: 0x00,
-            vram_dma: byte_vec_for_range(0xFF51, 0xFF55),
-            bg_obj_palettes: byte_vec_for_range(0xFF68, 0xFF6B),
-            wram_bank_select: 0x00,
         }
     }
 }
@@ -186,11 +178,6 @@ impl MMU {
             0x40..=0x45 => self.video.read_register(select_byte),
             0x46 => panic!("Reading from DMA transfer register"),
             0x47..=0x4B => self.video.read_register(select_byte),
-            0x4F => self.io.vram_bank_select,
-            0x50 => self.io.boot_rom_disabled,
-            0x51..=0x55 => self.io.vram_dma[(select_byte - 0x51) as usize],
-            0x68..=0x6B => self.io.bg_obj_palettes[(select_byte - 0x68) as usize],
-            0x70 => self.io.wram_bank_select,
             _ => panic!("Read for unmapped IO address: {:#06X}", address.value()),
         }
     }
@@ -211,11 +198,6 @@ impl MMU {
             0x40..=0x45 => self.video.write_register(select_byte, value),
             0x46 => self.do_dma_transfer(value),
             0x47..=0x4B => self.video.write_register(select_byte, value),
-            0x4F => self.io.vram_bank_select = value,
-            0x50 => self.io.boot_rom_disabled = value,
-            0x51..=0x55 => self.io.vram_dma[(select_byte - 0x51) as usize] = value,
-            0x68..=0x6B => self.io.bg_obj_palettes[(select_byte - 0x68) as usize] = value,
-            0x70 => self.io.wram_bank_select = value,
             _ => panic!("Write for unmapped IO address: {:#06X}", address.value()),
         };
     }
