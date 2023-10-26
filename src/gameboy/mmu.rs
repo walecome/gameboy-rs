@@ -120,7 +120,7 @@ impl MMU {
             0xA000..=0xBFFF => todo!("Read from cartridge RAM"),
             0xC000..=0xDFFF => self.internal_ram[address.index_value() - 0xC000],
             0xE000..=0xFDFF => panic!("Read access for prohibited memory area"),
-            0xFE00..=0xFE9F => todo!("Read OAM"),
+            0xFE00..=0xFE9F => self.video.read_oam(Address::new(address.value() - 0xFE00)),
             0xFEA0..=0xFEFF => panic!("Read access for prohibited memory area"),
             0xFF00..=0xFF7F => self.read_io(address),
             0xFF80..=0xFFFE => self.high_ram[address.index_value() - 0xFF80],
@@ -148,7 +148,7 @@ impl MMU {
             0xA000..=0xBFFF => todo!("Write to cartridge RAM"),
             0xC000..=0xDFFF => self.internal_ram[address.index_value() - 0xC000] = value,
             0xE000..=0xFDFF => panic!("Write access for prohibited memory area"),
-            0xFE00..=0xFE9F => todo!("Write OAM"),
+            0xFE00..=0xFE9F => self.video.write_oam(Address::new(address.value() - 0xFE00), value),
             0xFEA0..=0xFEFF => panic!("Write access for prohibited memory area"),
             0xFF00..=0xFF7F => self.write_io(address, value),
             0xFF80..=0xFFFE => self.high_ram[address.index_value() - 0xFF80] = value,
@@ -158,7 +158,7 @@ impl MMU {
 
     pub fn write_word(&mut self, address: Address, value: Word) {
         self.write(address, value.low());
-        self.write(address.next(), value.high());
+        self.write(address.next(), value.high())VRAM
     }
 
 

@@ -162,6 +162,8 @@ pub struct Video {
 
     // internal
     current_dot: usize,
+    oam_access_allowed: bool,
+    vram_access_allowed: bool,
 }
 
 impl Video {
@@ -171,7 +173,6 @@ impl Video {
             lcd_status: LcdStatus::new(),
             lcd_control: LcdControl::new(),
             lyc: 0,
-            current_dot: 0,
             scy: 0,
             scx: 0,
             bg_palette: Palette::new(),
@@ -179,6 +180,10 @@ impl Video {
             obj_palette_1: Palette::new(),
             window_y: 0,
             window_x: 0,
+
+            current_dot: 0,
+            oam_access_allowed: true,
+            vram_access_allowed: true,
         }
     }
 
@@ -220,16 +225,19 @@ impl Video {
                 if self.lcd_status.get_field(LcdStatusBit::Mode2IntSelect) {
                     todo!("Trigger STAT interrupt");
                 }
+                self.oam_access_allowed = false;
             },
 
             VideoMode::Mode3DrawPixels => {
-
+                self.vram_access_allowed = false;
             },
 
             VideoMode::Mode0HorizontalBlank => {
                 if self.lcd_status.get_field(LcdStatusBit::Mode0IntSelect) {
                     todo!("Trigger STAT interrupt");
                 }
+                self.oam_access_allowed = true;
+                self.vram_access_allowed = true;
             },
 
             VideoMode::Mode1VerticalBlank => {
@@ -264,12 +272,38 @@ impl Video {
     }
 
     pub fn write_vram(&mut self, address: Address, value: u8) {
+        if !self.vram_access_allowed {
+            // TODO: Log?
+            return;
+        }
         self.vram[address.index_value()] = value;
     }
 
     pub fn read_vram(&self, address: Address) -> u8 {
+        if !self.vram_access_allowed {
+            // TODO: Log?
+            return 0xFF;
+        }
         self.vram[address.index_value()]
     }
+
+    pub fn write_oam(&mut self, address: Address, value: u8) {
+        if !self.oam_access_allowed {
+            // TODO: Log?
+            return;
+        }
+        todo!("Write to OAM");
+
+    }
+
+    pub fn read_oam(&self, address: Address) -> u8 {
+        if !self.oam_access_allowed {
+            // TODO: Log?
+            return 0xFF;
+        }
+        todo!("Read from OAM");
+    }
+
 
     pub fn read_register(&self, select_byte: u8) -> u8 {
         match select_byte {
