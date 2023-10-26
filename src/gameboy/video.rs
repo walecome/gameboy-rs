@@ -95,45 +95,50 @@ impl LcdControl {
 }
 
 #[derive(Copy, Clone)]
-enum BgColor {
-    White = 0,
+enum PaletteColor {
+    // TODO: Not sure if this correct. Pandocs specifies:
+    // "[OBP] They work exactly like BGP, except that the
+    // lower two bits are ignored because color index 0
+    // is transparent for OBJs."
+    // What's not clear to me is what should be ignored?
+    WhiteOrTransparent = 0,
     LightGray = 1,
     DarkGray = 2,
     Black = 3,
 }
 
-struct BgPalette {
-    id0: BgColor,
-    id1: BgColor,
-    id2: BgColor,
-    id3: BgColor,
+struct Palette {
+    id0: PaletteColor,
+    id1: PaletteColor,
+    id2: PaletteColor,
+    id3: PaletteColor,
 }
 
-fn map_bg_color(value: u8) -> BgColor {
+fn map_palette_color(value: u8) -> PaletteColor {
     match value {
-        0 => BgColor::White,
-        1 => BgColor::LightGray,
-        2 => BgColor::DarkGray,
-        3 => BgColor::Black,
+        0 => PaletteColor::WhiteOrTransparent,
+        1 => PaletteColor::LightGray,
+        2 => PaletteColor::DarkGray,
+        3 => PaletteColor::Black,
         _ => panic!("Invalid bg color"),
     }
 }
 
-impl BgPalette {
+impl Palette {
     fn new() -> Self {
         Self {
-            id0: BgColor::White,
-            id1: BgColor::White,
-            id2: BgColor::White,
-            id3: BgColor::White,
+            id0: PaletteColor::WhiteOrTransparent,
+            id1: PaletteColor::WhiteOrTransparent,
+            id2: PaletteColor::WhiteOrTransparent,
+            id3: PaletteColor::WhiteOrTransparent,
         }
     }
 
     fn write_as_byte(&mut self, value: u8) {
-        self.id0 = map_bg_color((value & 0b0000_0011) >> 0);
-        self.id1 = map_bg_color((value & 0b0000_1100) >> 2);
-        self.id2 = map_bg_color((value & 0b0011_0000) >> 4);
-        self.id3 = map_bg_color((value & 0b1100_0000) >> 6);
+        self.id0 = map_palette_color((value & 0b0000_0011) >> 0);
+        self.id1 = map_palette_color((value & 0b0000_1100) >> 2);
+        self.id2 = map_palette_color((value & 0b0011_0000) >> 4);
+        self.id3 = map_palette_color((value & 0b1100_0000) >> 6);
     }
 
     fn read_as_byte(&self) -> u8 {
@@ -149,7 +154,9 @@ pub struct Video {
     lcd_control: LcdControl,
     scy: u8,
     scx: u8,
-    bg_palette: BgPalette,
+    bg_palette: Palette,
+    obj_palette_0: Palette,
+    obj_palette_1: Palette,
 
     // internal
     current_dot: usize,
@@ -165,7 +172,9 @@ impl Video {
             current_dot: 0,
             scy: 0,
             scx: 0,
-            bg_palette: BgPalette::new(),
+            bg_palette: Palette::new(),
+            obj_palette_0: Palette::new(),
+            obj_palette_1: Palette::new(),
         }
     }
 
@@ -268,6 +277,8 @@ impl Video {
             0x45 => self.lyc,
             0x46 => panic!("Should be handled by MMU"),
             0x47 => self.bg_palette.read_as_byte(),
+            0x48 => self.obj_palette_0.read_as_byte(),
+            0x49 => self.obj_palette_1.read_as_byte(),
             _ => todo!()
         }
     }
@@ -282,6 +293,8 @@ impl Video {
             0x45 => self.lyc = value,
             0x46 => panic!("Should be handled by MMU"),
             0x47 => self.bg_palette.write_as_byte(value),
+            0x48 => self.obj_palette_0.write_as_byte(value),
+            0x49 => self.obj_palette_1.write_as_byte(value),
             _ => todo!(),
         }
     }
