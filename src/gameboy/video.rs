@@ -9,6 +9,7 @@ const DOTS_PER_FRAME: usize = 70224;
 const DOTS_OAM_SCAN: usize = 80;
 const MIN_DOTS_DRAW_PIXELS: usize = 172;
 
+#[derive(Debug)]
 struct Point {
     x: usize,
     y: usize,
@@ -246,8 +247,9 @@ impl Video {
             VideoMode::Mode2OamScan => VideoMode::Mode3DrawPixels,
             VideoMode::Mode3DrawPixels => VideoMode::Mode0HorizontalBlank,
             VideoMode::Mode0HorizontalBlank => {
-                self.draw_scanline();
-                if point.y >= 144 {
+                // As we're exiting HBLANK, it means we're at the next line already.
+                self.draw_scanline((point.y - 1) as u8);
+                if point.y >= (SCREEN_HEIGHT as usize) {
                     VideoMode::Mode1VerticalBlank
                 } else {
                     VideoMode::Mode2OamScan
@@ -299,8 +301,7 @@ impl Video {
             },
 
             VideoMode::Mode0HorizontalBlank => {
-                assert!(point.y <= 144);
-                point.y >= 144
+                point.x >= DOTS_PER_LINE
             },
 
             VideoMode::Mode1VerticalBlank => {
@@ -385,28 +386,26 @@ impl Video {
 
     fn current_point(&self) -> Point {
         Point {
-            x: self.current_dot / DOTS_PER_LINE,
-            y: self.current_dot % DOTS_PER_LINE,
+            x: self.current_dot % DOTS_PER_LINE,
+            y: ((self.current_dot % DOTS_PER_FRAME) / DOTS_PER_LINE),
         }
     }
 
-    fn draw_scanline(&mut self) {
+    fn draw_scanline(&mut self, line: u8) {
         if !self.lcd_control.get_field(LcdControlBit::LcdEnable) {
             return;
         }
 
         if self.lcd_control.get_field(LcdControlBit::BgWindowEnable) {
-            self.draw_bg_for_current_line();
+            self.draw_bg_for_current_line(line);
             if self.lcd_control.get_field(LcdControlBit::WindowEnable) {
                 self.draw_window_for_current_line();
             }
         }
     }
 
-    fn draw_bg_for_current_line(&mut self) {
-        let point = self.current_point();
-
-        let y = point.y as u8;
+    fn draw_bg_for_current_line(&mut self, line: u8) {
+        let y = line;
 
         for x in 0..SCREEN_WIDTH {
             let tile_index = self.resolve_tile_index(x, y);
@@ -435,7 +434,7 @@ impl Video {
         let tile_x = scrolled_x / 8;
         let tile_y = scrolled_y / 8;
 
-        let tile_addr_offset = tile_y * 32 + tile_x;
+        let tile_addr_offset = (tile_y as u16) * 32 + tile_x as u16;
 
         let tile_map_start_addr: u16 = if self.lcd_control.get_field(
             LcdControlBit::BgTileMapArea,
@@ -445,7 +444,7 @@ impl Video {
             0x9800
         };
 
-        let tile_index_addr = Address::new(tile_map_start_addr + (tile_addr_offset as u16));
+        let tile_index_addr = Address::new(tile_map_start_addr + tile_addr_offset);
         return self.read_vram(tile_index_addr);
     }
 
