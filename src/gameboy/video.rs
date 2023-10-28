@@ -160,19 +160,41 @@ impl Palette {
     }
 }
 
-struct FrameBuffer {
-    data: Vec<u8>,
+#[derive(Clone, Copy)]
+struct RgbColor {
+    r: u8,
+    g: u8,
+    b: u8,
 }
 
-fn to_screen_color(_palette_color: PaletteColor) -> u8 {
-    todo!("Implement")
+impl RgbColor {
+    fn new(r: u8, g: u8, b: u8) -> Self {
+        Self { r, g, b, }
+    }
+
+    fn new_gray(shade: u8) -> Self {
+        RgbColor::new(shade, shade, shade)
+    }
+}
+
+struct FrameBuffer {
+    data: Vec<RgbColor>,
+}
+
+fn to_screen_color(palette_color: PaletteColor) -> RgbColor {
+    match palette_color {
+        PaletteColor::WhiteOrTransparent => RgbColor::new_gray(255),
+        PaletteColor::LightGray => RgbColor::new_gray(160),
+        PaletteColor::DarkGray => RgbColor::new_gray(90),
+        PaletteColor::Black => RgbColor::new_gray(0),
+    }
 }
 
 impl FrameBuffer {
     fn new() -> Self {
         let pixel_count = SCREEN_WIDTH as usize * SCREEN_HEIGHT as usize;
         Self {
-            data: vec![0x00; pixel_count],
+            data: vec![to_screen_color(PaletteColor::WhiteOrTransparent); pixel_count],
         }
     }
 
