@@ -133,6 +133,7 @@ pub struct CPU {
 
     // Debug
     depth: usize,
+    trace_cpu: bool,
 }
 
 impl fmt::Debug for CPU {
@@ -181,7 +182,7 @@ enum OpcodeType {
 }
 
 impl CPU {
-    pub fn new(cartridge: Box<dyn Cartridge>) -> CPU {
+    pub fn new(cartridge: Box<dyn Cartridge>, trace_cpu: bool) -> CPU {
         CPU {
             pc: 0x0000,
             sp: 0x0FFFE,
@@ -197,6 +198,7 @@ impl CPU {
             flag_register: FlagRegister::new(),
             did_take_conditional_branch: false,
             depth: 0,
+            trace_cpu,
         }
     }
 
@@ -206,8 +208,10 @@ impl CPU {
         let pc = self.pc;
         let (instruction, opcode_type, opcode) = self.next_instruction();
 
-        print!("{:.<1$}", "", 1 * self.depth);
-        println!("{:#06X}: {:#04X} ({:?})", pc, opcode, instruction);
+        if self.trace_cpu {
+            print!("{:.<1$}", "", 1 * self.depth);
+            println!("{:#06X}: {:#04X} ({:?})", pc, opcode, instruction);
+        }
 
         verify_state(self, maybe_metadata, i, pc);
 

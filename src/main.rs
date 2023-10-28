@@ -24,6 +24,8 @@ struct Args {
     rom: PathBuf,
     #[arg(long)]
     reference: Option<PathBuf>,
+    #[arg(long)]
+    trace_cpu: bool,
 }
 
 struct Gameboy {
@@ -49,7 +51,7 @@ impl Gameboy {
         };
 
         Self {
-            cpu: CPU::new(cartridge),
+            cpu: CPU::new(cartridge, args.trace_cpu),
 
             index: 0,
             maybe_reference_metadata: if let Some(reference) = args.reference {
