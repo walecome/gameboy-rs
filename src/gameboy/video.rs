@@ -1,8 +1,8 @@
 use super::address::Address;
 use super::utils::{get_bit, set_bit_mut};
 
-const SCREEN_WIDTH: u8 = 160;
-const SCREEN_HEIGHT: u8 = 144;
+pub const SCREEN_WIDTH: u8 = 160;
+pub const SCREEN_HEIGHT: u8 = 144;
 
 const DOTS_PER_LINE: usize = 456;
 const DOTS_PER_FRAME: usize = 70224;
@@ -161,10 +161,10 @@ impl Palette {
 }
 
 #[derive(Clone, Copy)]
-struct RgbColor {
-    r: u8,
-    g: u8,
-    b: u8,
+pub struct RgbColor {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
 }
 
 impl RgbColor {
@@ -177,8 +177,10 @@ impl RgbColor {
     }
 }
 
-struct FrameBuffer {
+pub struct FrameBuffer {
     data: Vec<RgbColor>,
+    pub width: usize,
+    pub height: usize,
 }
 
 fn to_screen_color(palette_color: PaletteColor) -> RgbColor {
@@ -191,15 +193,22 @@ fn to_screen_color(palette_color: PaletteColor) -> RgbColor {
 }
 
 impl FrameBuffer {
-    fn new() -> Self {
-        let pixel_count = SCREEN_WIDTH as usize * SCREEN_HEIGHT as usize;
+    fn new(width: usize, height: usize) -> Self {
+        let pixel_count = width * height;
         Self {
             data: vec![to_screen_color(PaletteColor::WhiteOrTransparent); pixel_count],
+            width,
+            height,
         }
     }
 
+    pub fn get_pixel(&self, x: usize, y: usize) -> RgbColor {
+        let index = y as usize * self.width + x as usize;
+        self.data[index]
+    }
+
     fn set_pixel(&mut self, x: u8, y: u8, color: PaletteColor) {
-        let index = y as usize * SCREEN_WIDTH as usize + x as usize;
+        let index = y as usize * self.width + x as usize;
         self.data[index] = to_screen_color(color);
     }
 }
@@ -223,6 +232,7 @@ pub struct Video {
     oam_access_allowed: bool,
     vram_access_allowed: bool,
     frame_buffer: FrameBuffer,
+    is_frame_ready: bool,
 }
 
 impl Video {
@@ -243,8 +253,17 @@ impl Video {
             current_dot: 0,
             oam_access_allowed: true,
             vram_access_allowed: true,
-            frame_buffer: FrameBuffer::new(),
+            frame_buffer: FrameBuffer::new(SCREEN_WIDTH as usize, SCREEN_HEIGHT as usize),
+            is_frame_ready: true,
         }
+    }
+
+    pub fn try_take_frame(&mut self) -> Option<&FrameBuffer> {
+        if !self.is_frame_ready {
+            return None;
+        }
+        self.is_frame_ready = false;
+        return Some(&self.frame_buffer);
     }
 
     pub fn tick(&mut self, elapsed_cycles: usize) {
@@ -277,7 +296,10 @@ impl Video {
                     VideoMode::Mode2OamScan
                 }
             }
-            VideoMode::Mode1VerticalBlank => VideoMode::Mode2OamScan,
+            VideoMode::Mode1VerticalBlank => {
+                self.is_frame_ready = true;
+                VideoMode::Mode2OamScan
+            },
         };
 
         self.lcd_status.set_ppu_mode(next_mode);

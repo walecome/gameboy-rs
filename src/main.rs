@@ -5,10 +5,18 @@ use std::{fs, path::PathBuf};
 use clap::Parser;
 
 use gameboy::header::Header;
+use gameboy::video::FrameBuffer;
 
 use crate::gameboy::cartridge::create_for_cartridge_type;
 use crate::gameboy::cpu::CPU;
-use crate::gameboy::reference::{ReferenceMetadata, get_reference_metadata};
+use crate::gameboy::reference::{get_reference_metadata, ReferenceMetadata};
+use crate::gameboy::video::{RgbColor, SCREEN_HEIGHT, SCREEN_WIDTH};
+
+extern crate sdl2;
+use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
+use sdl2::pixels::Color;
+use sdl2::pixels::PixelFormatEnum;
 
 #[derive(Parser)]
 struct Args {
@@ -34,10 +42,11 @@ impl Gameboy {
 
         let cartridge = match create_for_cartridge_type(header.cartridge_type, rom_data) {
             Some(cartridge) => cartridge,
-            None => todo!("Cartridge not implemented for type: {:?}", header.cartridge_type),
+            None => todo!(
+                "Cartridge not implemented for type: {:?}",
+                header.cartridge_type
+            ),
         };
-
-        let mut index = 0;
 
         Self {
             cpu: CPU::new(cartridge),
@@ -64,7 +73,7 @@ impl Gameboy {
         match maybe_cycles {
             Some(cycles) => {
                 self.cpu.mmu().video().tick(cycles as usize);
-            },
+            }
             None => {
                 println!("HALT!");
                 return false;
@@ -75,14 +84,88 @@ impl Gameboy {
 
         return true;
     }
+
+    fn try_take_frame(&mut self) -> Option<&FrameBuffer> {
+        self.cpu.mmu().video().try_take_frame()
+    }
 }
 
-fn main() {
+fn main() -> Result<(), String> {
     let mut gameboy = Gameboy::new(Args::parse());
 
-    loop {
+    let sdl_context = sdl2::init()?;
+    let video_subsystem = sdl_context.video()?;
+
+    let window = video_subsystem
+        .window("Chip-8 emulator", 1200, 600)
+        .position_centered()
+        .opengl()
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
+    let texture_creator = canvas.texture_creator();
+
+    fn write_pixel(buffer: &mut [u8], pitch: usize, x: usize, y: usize, color: RgbColor) {
+        let offset = y * pitch + x * 3;
+        buffer[offset] = color.r;
+        buffer[offset + 1] = color.g;
+        buffer[offset + 2] = color.b
+    }
+
+    let width = SCREEN_WIDTH as usize;
+    let height = SCREEN_HEIGHT as usize;
+
+    let mut texture = texture_creator
+        .create_texture_streaming(PixelFormatEnum::RGB24, width as u32, height as u32)
+        .map_err(|e| e.to_string())?;
+
+    // Initial texture
+    if let Some(frame_buffer) = gameboy.try_take_frame() {
+        texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
+            for y in 0..height {
+                for x in 0..width {
+                    write_pixel(buffer, pitch, x, y, frame_buffer.get_pixel(x, y));
+                }
+            }
+        })?;
+    }
+
+    canvas.clear();
+    canvas.copy(&texture, None, None)?;
+    canvas.present();
+    let mut event_pump = sdl_context.event_pump()?;
+
+    'running: loop {
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. }
+                | Event::KeyDown {
+                    keycode: Some(Keycode::Escape),
+                    ..
+                } => break 'running,
+                _ => {}
+            }
+        }
         if !gameboy.tick() {
-            return;
+            break 'running;
+        }
+
+        if let Some(frame_buffer) = gameboy.try_take_frame() {
+            canvas.set_draw_color(Color::RGB(0, 0, 0));
+            canvas.clear();
+            texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
+                for y in 0..height {
+                    for x in 0..width {
+                        write_pixel(buffer, pitch, x, y, frame_buffer.get_pixel(x, y));
+                    }
+                }
+            })?;
+
+            canvas.copy(&texture, None, None)?;
+            canvas.present();
         }
     }
+
+    return Ok(());
 }
