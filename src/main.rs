@@ -18,46 +18,71 @@ struct Args {
     reference: Option<PathBuf>,
 }
 
-fn main() -> ! {
-    let args = Args::parse();
+struct Gameboy {
+    cpu: CPU,
 
-    let maybe_reference_metadata: Option<Vec<ReferenceMetadata>> =
-        if let Some(reference) = args.reference {
-            Some(get_reference_metadata(&reference))
-        } else {
-            None
+    // Internal / debug
+    index: usize,
+    maybe_reference_metadata: Option<Vec<ReferenceMetadata>>,
+}
+
+impl Gameboy {
+    fn new(args: Args) -> Self {
+        let rom_data = fs::read(args.rom).unwrap();
+        let header = Header::read_from_rom(&rom_data).unwrap();
+        println!("{:?}", header);
+
+        let cartridge = match create_for_cartridge_type(header.cartridge_type, rom_data) {
+            Some(cartridge) => cartridge,
+            None => todo!("Cartridge not implemented for type: {:?}", header.cartridge_type),
         };
 
-    let rom_data = fs::read(args.rom).unwrap();
-    let header = Header::read_from_rom(&rom_data).unwrap();
-    println!("{:?}", header);
+        let mut index = 0;
 
-    let cartridge = match create_for_cartridge_type(header.cartridge_type, rom_data) {
-        Some(cartridge) => cartridge,
-        None => todo!("Cartridge not implemented for type: {:?}", header.cartridge_type),
-    };
+        Self {
+            cpu: CPU::new(cartridge),
 
-    let mut index = 0;
+            index: 0,
+            maybe_reference_metadata: if let Some(reference) = args.reference {
+                Some(get_reference_metadata(&reference))
+            } else {
+                None
+            },
+        }
+    }
 
-    let mut cpu = CPU::new(cartridge);
-    loop {
-        let current_metadata = if let Some(reference_metadata) = &maybe_reference_metadata {
-            if index >= reference_metadata.len() {
+    fn tick(&mut self) -> bool {
+        let current_metadata = if let Some(reference_metadata) = &self.maybe_reference_metadata {
+            if self.index >= reference_metadata.len() {
                 panic!("Ran out of reference data");
             }
-            Some(&reference_metadata[index])
+            Some(&reference_metadata[self.index])
         } else {
             None
         };
-        let maybe_cycles = cpu.tick(current_metadata, index);
+        let maybe_cycles = self.cpu.tick(current_metadata, self.index);
         match maybe_cycles {
             Some(cycles) => {
-                cpu.mmu().video().tick(cycles as usize);
+                self.cpu.mmu().video().tick(cycles as usize);
             },
             None => {
-                todo!("HALT!")
+                println!("HALT!");
+                return false;
             }
         }
-        index += 1;
+
+        self.index += 1;
+
+        return true;
+    }
+}
+
+fn main() {
+    let mut gameboy = Gameboy::new(Args::parse());
+
+    loop {
+        if !gameboy.tick() {
+            return;
+        }
     }
 }
