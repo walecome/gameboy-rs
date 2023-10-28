@@ -99,7 +99,7 @@ fn main() -> Result<(), String> {
     let video_subsystem = sdl_context.video()?;
 
     let window = video_subsystem
-        .window("Chip-8 emulator", 1200, 600)
+        .window("Gameboy emulator", 600, 540)
         .position_centered()
         .opengl()
         .build()
