@@ -158,7 +158,7 @@ impl MMU {
 
     pub fn write_word(&mut self, address: Address, value: Word) {
         self.write(address, value.low());
-        self.write(address.next(), value.high())VRAM
+        self.write(address.next(), value.high());
     }
 
 
