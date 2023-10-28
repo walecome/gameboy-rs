@@ -233,6 +233,7 @@ pub struct Video {
     vram_access_allowed: bool,
     frame_buffer: FrameBuffer,
     is_frame_ready: bool,
+    last_line: usize,
 }
 
 impl Video {
@@ -255,6 +256,7 @@ impl Video {
             vram_access_allowed: true,
             frame_buffer: FrameBuffer::new(SCREEN_WIDTH as usize, SCREEN_HEIGHT as usize),
             is_frame_ready: true,
+            last_line: 0,
         }
     }
 
@@ -269,7 +271,12 @@ impl Video {
     pub fn tick(&mut self, elapsed_cycles: usize) {
         self.current_dot += elapsed_cycles;
 
-        if !self.is_current_mode_ending() {
+        let should_do_work = self.is_current_mode_ending();
+        let point = self.current_point();
+
+        self.last_line = point.y;
+
+        if !should_do_work {
             return;
         }
 
@@ -325,6 +332,7 @@ impl Video {
             },
 
             VideoMode::Mode1VerticalBlank => {
+                self.current_dot = self.current_dot % DOTS_PER_FRAME;
                 if self.lcd_status.get_field(LcdStatusBit::Mode1IntSelect) {
                     todo!("Trigger STAT interrupt");
                 }
@@ -345,7 +353,7 @@ impl Video {
             },
 
             VideoMode::Mode0HorizontalBlank => {
-                point.x >= DOTS_PER_LINE
+                point.y > self.last_line
             },
 
             VideoMode::Mode1VerticalBlank => {
