@@ -1,6 +1,9 @@
 use super::address::Address;
 use super::utils::{get_bit, set_bit_mut};
 
+const SCREEN_WIDTH: u8 = 160;
+const SCREEN_HEIGHT: u8 = 144;
+
 const DOTS_PER_LINE: usize = 456;
 const DOTS_PER_FRAME: usize = 70224;
 const DOTS_OAM_SCAN: usize = 80;
@@ -72,14 +75,14 @@ struct LcdControl {
 }
 
 enum LcdControlBit {
-    BgWindowEnablePriority = 0,
+    BgWindowEnable = 0,
     ObjEnable = 1,
     ObjSize = 2,
-    BgTileMap = 3,
-    BgAndWindowTiles = 4,
+    BgTileMapArea = 3,
+    BgAndWindowTileDataArea = 4,
     WindowEnable = 5,
-    WindowTileMap = 6,
-    LcdAndPpuEnable = 7,
+    WindowTileMapArea = 6,
+    LcdEnable = 7,
 }
 
 impl LcdControl {
@@ -144,6 +147,38 @@ impl Palette {
     fn read_as_byte(&self) -> u8 {
         ((self.id3 as u8) << 6) | ((self.id2 as u8) << 4) | ((self.id1 as u8) << 2) | self.id0 as u8
     }
+
+    fn read_color_id(&self, color_id: u8) -> PaletteColor {
+        match color_id {
+            0 => self.id0,
+            1 => self.id1,
+            2 => self.id2,
+            3 => self.id3,
+            _ => panic!("Invalid color ID: {}", color_id),
+        }
+    }
+}
+
+struct FrameBuffer {
+    data: Vec<u8>,
+}
+
+fn to_screen_color(_palette_color: PaletteColor) -> u8 {
+    todo!("Implement")
+}
+
+impl FrameBuffer {
+    fn new() -> Self {
+        let pixel_count = SCREEN_WIDTH as usize * SCREEN_HEIGHT as usize;
+        Self {
+            data: vec![0x00; pixel_count],
+        }
+    }
+
+    fn set_pixel(&mut self, x: u8, y: u8, color: PaletteColor) {
+        let index = y as usize * SCREEN_WIDTH as usize + x as usize;
+        self.data[index] = to_screen_color(color);
+    }
 }
 
 pub struct Video {
@@ -164,6 +199,7 @@ pub struct Video {
     current_dot: usize,
     oam_access_allowed: bool,
     vram_access_allowed: bool,
+    frame_buffer: FrameBuffer,
 }
 
 impl Video {
@@ -184,6 +220,7 @@ impl Video {
             current_dot: 0,
             oam_access_allowed: true,
             vram_access_allowed: true,
+            frame_buffer: FrameBuffer::new(),
         }
     }
 
@@ -209,6 +246,7 @@ impl Video {
             VideoMode::Mode2OamScan => VideoMode::Mode3DrawPixels,
             VideoMode::Mode3DrawPixels => VideoMode::Mode0HorizontalBlank,
             VideoMode::Mode0HorizontalBlank => {
+                self.draw_scanline();
                 if point.y >= 144 {
                     VideoMode::Mode1VerticalBlank
                 } else {
@@ -276,7 +314,8 @@ impl Video {
             // TODO: Log?
             return;
         }
-        self.vram[address.index_value()] = value;
+        let index = address.index_value() - 0x8000;
+        self.vram[index] = value;
     }
 
     pub fn read_vram(&self, address: Address) -> u8 {
@@ -284,7 +323,8 @@ impl Video {
             // TODO: Log?
             return 0xFF;
         }
-        self.vram[address.index_value()]
+        let index = address.index_value() - 0x8000;
+        self.vram[index]
     }
 
     pub fn write_oam(&mut self, address: Address, value: u8) {
@@ -292,6 +332,7 @@ impl Video {
             // TODO: Log?
             return;
         }
+        let _index = address.index_value() - 0xFE00;
         todo!("Write to OAM");
 
     }
@@ -301,6 +342,7 @@ impl Video {
             // TODO: Log?
             return 0xFF;
         }
+        let _index = address.index_value() - 0xFE00;
         todo!("Read from OAM");
     }
 
@@ -346,5 +388,93 @@ impl Video {
             x: self.current_dot / DOTS_PER_LINE,
             y: self.current_dot % DOTS_PER_LINE,
         }
+    }
+
+    fn draw_scanline(&mut self) {
+        if !self.lcd_control.get_field(LcdControlBit::LcdEnable) {
+            return;
+        }
+
+        if self.lcd_control.get_field(LcdControlBit::BgWindowEnable) {
+            self.draw_bg_for_current_line();
+            if self.lcd_control.get_field(LcdControlBit::WindowEnable) {
+                self.draw_window_for_current_line();
+            }
+        }
+    }
+
+    fn draw_bg_for_current_line(&mut self) {
+        let point = self.current_point();
+
+        let y = point.y as u8;
+
+        for x in 0..SCREEN_WIDTH {
+            let tile_index = self.resolve_tile_index(x, y);
+            let tile_start_addr = self.resolve_tile_addr(tile_index);
+
+            let x_in_tile = self.scx.wrapping_add(x) % 8;
+            let y_in_tile = self.scy.wrapping_add(y) % 8;
+            let tile_row_addr = Address::new(tile_start_addr.value() + y_in_tile as u16);
+
+            let color = self.read_tile_pixel_color(tile_row_addr, x_in_tile, &self.bg_palette);
+            self.frame_buffer.set_pixel(x, y, color);
+        }
+
+    }
+
+    fn draw_window_for_current_line(&mut self) {
+
+    }
+
+    fn resolve_tile_index(&self, x: u8, y: u8) -> u8 {
+        // Background map is 256x256 pixels, i.e. 32x32 tiles (tiles are 8x8 pixel)
+
+        let scrolled_x = self.scx.wrapping_add(x);
+        let scrolled_y = self.scy.wrapping_add(y);
+
+        let tile_x = scrolled_x / 8;
+        let tile_y = scrolled_y / 8;
+
+        let tile_addr_offset = tile_y * 32 + tile_x;
+
+        let tile_map_start_addr: u16 = if self.lcd_control.get_field(
+            LcdControlBit::BgTileMapArea,
+        ) {
+            0x9C00
+        } else {
+            0x9800
+        };
+
+        let tile_index_addr = Address::new(tile_map_start_addr + (tile_addr_offset as u16));
+        return self.read_vram(tile_index_addr);
+    }
+
+    fn resolve_tile_addr(&self, tile_index: u8) -> Address {
+        let tile_byte_count: u16 = 16;
+
+        return if self.lcd_control.get_field(
+            LcdControlBit::BgAndWindowTileDataArea,
+        ) {
+            let tile_data_start = 0x8000;
+            Address::new(tile_data_start + tile_byte_count * (tile_index as u16))
+        } else {
+            let tile_data_base = 0x9000 as i32;
+            let signed_tile_index = tile_index as i8 as i32;
+            let target = tile_data_base + (tile_byte_count as i32) * signed_tile_index;
+            Address::new(target as u16)
+        };
+    }
+
+    fn read_tile_pixel_color(&self, tile_row_addr: Address, x_in_tile: u8, palette: &Palette) -> PaletteColor {
+        assert!(x_in_tile < 8);
+        let first_byte = self.read_vram(tile_row_addr);
+        let second_byte = self.read_vram(tile_row_addr.next());
+
+        let ls_bit_color_id = if get_bit(first_byte, 7 - x_in_tile) { 1 } else { 0 };
+        let ms_bit_color_id = if get_bit(second_byte, 7 - x_in_tile) { 1 } else { 0 };
+
+        let color_id = ms_bit_color_id << 1 | ls_bit_color_id;
+
+        return palette.read_color_id(color_id);
     }
 }
