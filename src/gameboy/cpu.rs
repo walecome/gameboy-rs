@@ -256,6 +256,7 @@ impl CPU {
             Instruction::Rlca => self.rlca(),
             Instruction::Rrca => self.rrca(),
             Instruction::CbBit { n, target } => self.bit(n, target),
+            Instruction::CbRes { n, target } => self.res(n, target),
             Instruction::Adc(target) => self.adc(target),
             Instruction::Sbc(target) => self.sbc(target),
             Instruction::JumpAddressHL => {
@@ -846,6 +847,19 @@ impl CPU {
                 z: Some(z),
                 n: Some(false),
                 h: Some(true),
+                c: None,
+            });
+        });
+    }
+
+    fn res(&mut self, n: u8, target: CommonOperand) {
+        self.apply_cb_target(target, |value| {
+            let result = set_bit(value, n, false);
+
+            return (Some(result), FlagChange {
+                z: None,
+                n: None,
+                h: None,
                 c: None,
             });
         });
