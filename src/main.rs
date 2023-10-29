@@ -139,21 +139,22 @@ fn main() -> Result<(), String> {
     let mut event_pump = sdl_context.event_pump()?;
 
     'running: loop {
-        for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit { .. }
-                | Event::KeyDown {
-                    keycode: Some(Keycode::Escape),
-                    ..
-                } => break 'running,
-                _ => {}
-            }
-        }
         if !gameboy.tick() {
             break 'running;
         }
 
         if let Some(frame_buffer) = gameboy.try_take_frame() {
+            for event in event_pump.poll_iter() {
+                match event {
+                    Event::Quit { .. }
+                    | Event::KeyDown {
+                        keycode: Some(Keycode::Escape),
+                        ..
+                    } => break 'running,
+                    _ => {}
+                }
+            }
+
             canvas.set_draw_color(Color::RGB(0, 0, 0));
             canvas.clear();
             texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
