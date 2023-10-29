@@ -9,7 +9,7 @@ pub enum RegisterU8 {
     L,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum RegisterU16 {
     AF,
     BC,

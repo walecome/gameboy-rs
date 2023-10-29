@@ -19,16 +19,24 @@ use super::cycles;
 struct RegisterPair<'a> {
     high: &'a mut u8,
     low: &'a mut u8,
+
+    reg: RegisterU16,
 }
 
 struct ImmutableRegisterPair<'a> {
     high: &'a u8,
     low: &'a u8,
+
+    reg: RegisterU16,
 }
 
 impl RegisterPair<'_> {
     fn get(&self) -> u16 {
-        ImmutableRegisterPair { high: self.high, low: self.low, }.get()
+        ImmutableRegisterPair {
+            high: self.high,
+            low: self.low,
+            reg: self.reg.clone()
+        }.get()
     }
 
     fn set(&mut self, value: u16) {
@@ -43,8 +51,20 @@ impl RegisterPair<'_> {
 impl ImmutableRegisterPair<'_> {
     fn get(&self) -> u16 {
         let high = self.high.clone() as u16;
-        let low = self.low.clone() as u16;
+        let low = self.get_low() as u16;
         return high << 8 | low;
+    }
+
+    fn get_low(&self) -> u8 {
+        match self.reg {
+            RegisterU16::AF => {
+                // Bottom nibble of F is always 0
+                self.low & 0xF0
+            },
+            RegisterU16::BC |
+            RegisterU16::DE |
+            RegisterU16::HL => *self.low,
+        }
     }
 }
 
@@ -338,7 +358,7 @@ impl CPU {
             RegisterU16::DE => (&mut self.d, &mut self.e),
             RegisterU16::HL => (&mut self.h, &mut self.l),
         };
-        RegisterPair { high, low }
+        RegisterPair { high, low, reg: reg.clone(), }
     }
 
     fn resolve_u16_reg_immutable(&self, reg: &RegisterU16) -> ImmutableRegisterPair {
@@ -348,7 +368,7 @@ impl CPU {
             RegisterU16::DE => (&self.d, &self.e),
             RegisterU16::HL => (&self.h, &self.l),
         };
-        ImmutableRegisterPair { high, low }
+        ImmutableRegisterPair { high, low, reg: reg.clone(), }
     }
 
     fn read_u8_target(&mut self, target: LoadSrcU8) -> u8 {
