@@ -267,6 +267,7 @@ impl CPU {
             }
             Instruction::CbSwap(target) => self.swap(target),
             Instruction::CbSla(target) => self.sla(target),
+            Instruction::CbSra(target) => self.sra(target),
             Instruction::Cpl => self.cpl(),
             Instruction::Scf => self.scf(),
             Instruction::Ccf => self.ccf(),
@@ -876,6 +877,22 @@ impl CPU {
             })
         });
     }
+
+    fn sra(&mut self, target: CommonOperand) {
+        self.apply_cb_target(target, |value| {
+            let carry = get_bit(value, 0);
+            let msb = get_bit(value, 7);
+            let result = set_bit(value >> 1, 7, msb);
+
+            return (Some(result), FlagChange {
+                z: Some(result == 0),
+                n: Some(false),
+                h: Some(false),
+                c: Some(carry),
+            })
+        });
+    }
+
 
     fn cpl(&mut self) {
         self.a = !self.a;
