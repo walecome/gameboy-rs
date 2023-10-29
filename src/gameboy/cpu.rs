@@ -255,6 +255,7 @@ impl CPU {
             Instruction::Rlca => self.rlca(),
             Instruction::CbBit { n, target } => self.bit(n, target),
             Instruction::Adc(target) => self.adc(target),
+            Instruction::Sbc(target) => self.sbc(target),
             Instruction::JumpAddressHL => {
                 // NOTE: This instruction has conflicting documentation.
                 //       It's specified as `JP (HL)`, so "PC = memory value for address HL".
@@ -653,6 +654,23 @@ impl CPU {
             n: Some(false),
             h: Some(half_carry),
             c: Some(result > 0xFF),
+        });
+    }
+
+    fn sbc(&mut self, target: LogicalOpTarget) {
+        let value = self.resolve_logical_op_target(target);
+        let carry_value: u8 = if self.flag_register.get_c() { 1 } else { 0 };
+
+        let new_carry = (self.a as u16) < (value as u16) + (carry_value as u16);
+        let half_carry = (self.a & 0xF) < ((value & 0xF) + carry_value);
+
+        self.a = self.a.wrapping_sub(value).wrapping_sub(carry_value);
+
+        self.apply_flag_change(FlagChange {
+            z: Some(self.a == 0),
+            n: Some(true),
+            h: Some(half_carry),
+            c: Some(new_carry),
         });
     }
 

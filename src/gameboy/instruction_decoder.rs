@@ -124,6 +124,7 @@ pub enum Instruction {
     Rla,
     Rlca,
     Adc(LogicalOpTarget),
+    Sbc(LogicalOpTarget),
 }
 
 fn resolve_common_operand_from_col(col: u8) -> CommonOperand {
@@ -452,6 +453,17 @@ fn try_decode_adc_instruction(opcode: u8) -> Option<Instruction> {
     })
 }
 
+fn try_decode_sbc_instruction(opcode: u8) -> Option<Instruction> {
+    Some(match opcode {
+        0x98..=0x9F => {
+            let operand = resolve_common_operand_from_col(opcode & 0xF);
+            Instruction::Sbc(LogicalOpTarget::Common(operand))
+        },
+        0xDE => Instruction::Sbc(LogicalOpTarget::ImmediateU8),
+        _ => return None,
+    })
+}
+
 fn try_decode_jp_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
         0xC2 => Instruction::JumpImmediate(Some(FlagCondition::NZ)),
@@ -528,6 +540,10 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
     }
 
     if let Some(instruction) = try_decode_adc_instruction(opcode) {
+        return Some(instruction);
+    }
+
+    if let Some(instruction) = try_decode_sbc_instruction(opcode) {
         return Some(instruction);
     }
 
