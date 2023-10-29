@@ -121,6 +121,7 @@ pub enum Instruction {
     CbRrc(CommonOperand),
     CbBit { n: u8, target: CommonOperand },
     CbRes { n: u8, target: CommonOperand },
+    CbSet { n: u8, target: CommonOperand },
     CbSwap(CommonOperand),
     CbSla(CommonOperand),
     CbSra(CommonOperand),
@@ -605,6 +606,14 @@ pub fn decode_cb(opcode: u8) -> Option<Instruction> {
         0xA8..=0xAF => Instruction::CbRes { n: 5, target, },
         0xB0..=0xBC => Instruction::CbRes { n: 6, target, },
         0xB8..=0xBF => Instruction::CbRes { n: 7, target, },
+        0xC0..=0xC7 => Instruction::CbSet { n: 0, target, },
+        0xC8..=0xCF => Instruction::CbSet { n: 1, target, },
+        0xD0..=0xD7 => Instruction::CbSet { n: 2, target, },
+        0xD8..=0xDF => Instruction::CbSet { n: 3, target, },
+        0xE0..=0xE7 => Instruction::CbSet { n: 4, target, },
+        0xE8..=0xEF => Instruction::CbSet { n: 5, target, },
+        0xF0..=0xFC => Instruction::CbSet { n: 6, target, },
+        0xF8..=0xFF => Instruction::CbSet { n: 7, target, },
         _ => return None,
     })
 }
