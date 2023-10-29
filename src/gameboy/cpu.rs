@@ -273,6 +273,7 @@ impl CPU {
             Instruction::Cpl => self.cpl(),
             Instruction::Scf => self.scf(),
             Instruction::Ccf => self.ccf(),
+            Instruction::Daa => self.daa(),
         }
 
         return Some(match (self.did_take_conditional_branch, opcode_type) {
@@ -948,6 +949,37 @@ impl CPU {
             n: Some(false),
             h: Some(false),
             c: Some(!self.flag_register.get_c()),
+        });
+    }
+
+    fn daa(&mut self) {
+        let mut carry = false;
+        if !self.flag_register.get_n() {
+            if self.flag_register.get_c() || self.a > 0x99 {
+                self.a = self.a.wrapping_add(0x60);
+                carry = true;
+            }
+
+            if self.flag_register.get_h() || self.a & 0x0F > 0x09 {
+                self.a = self.a.wrapping_add(0x06);
+            }
+        } else if self.flag_register.get_c() {
+            carry = true;
+
+            self.a = self.a.wrapping_add(if self.flag_register.get_h() {
+                0x9A
+            } else {
+                0xA0
+            });
+        } else if self.flag_register.get_h() {
+            self.a = self.a.wrapping_add(0xFA);
+        }
+
+        self.apply_flag_change(FlagChange {
+            z: Some(self.a == 0),
+            n: None,
+            h: Some(false),
+            c: Some(carry),
         });
     }
 

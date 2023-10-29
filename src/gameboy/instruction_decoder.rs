@@ -134,6 +134,7 @@ pub enum Instruction {
     Cpl,
     Scf,
     Ccf,
+    Daa,
 }
 
 fn resolve_common_operand_from_col(col: u8) -> CommonOperand {
@@ -567,6 +568,7 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
         0x0F => Some(Instruction::Rrca),
         0x17 => Some(Instruction::Rla),
         0x1F => Some(Instruction::Rra),
+        0x27 => Some(Instruction::Daa),
         0x2F => Some(Instruction::Cpl),
         0x37 => Some(Instruction::Scf),
         0x3F => Some(Instruction::Ccf),
