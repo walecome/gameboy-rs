@@ -178,6 +178,7 @@ impl MMU {
             0x40..=0x45 => self.video.read_register(select_byte),
             0x46 => panic!("Reading from DMA transfer register"),
             0x47..=0x4B => self.video.read_register(select_byte),
+            0x50 => self.io.boot_rom_disabled,
             _ => panic!("Read for unmapped IO address: {:#06X}", address.value()),
         }
     }
@@ -198,6 +199,7 @@ impl MMU {
             0x40..=0x45 => self.video.write_register(select_byte, value),
             0x46 => self.do_dma_transfer(value),
             0x47..=0x4B => self.video.write_register(select_byte, value),
+            0x50 => self.io.boot_rom_disabled = value,
             _ => panic!("Write for unmapped IO address: {:#06X}", address.value()),
         };
     }
