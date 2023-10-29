@@ -16,24 +16,20 @@ pub fn get_reference_metadata(reference: &PathBuf) -> Vec<ReferenceMetadata> {
     fs::read_to_string(reference)
         .unwrap()
         .lines()
-        .enumerate()
-        .map(|(i, line)| {
+        .filter_map(|line| {
             let parts: Vec<&str> = line.split(": ").collect();
+            let raw_addr = parts[0]
+                    .strip_prefix("0x")?;
             let pc = u16::from_str_radix(
-                parts[0]
-                    .strip_prefix("0x")
-                    .expect(format!("{}: {}", i, line).as_str()),
+                raw_addr,
                 16,
-            );
-            if pc.is_err() {
-                panic!("{} could not be made to hex", parts[0]);
-            }
+            ).ok()?;
             let instruction = parts[1].to_owned();
-            ReferenceMetadata {
-                pc: pc.unwrap(),
+            Some(ReferenceMetadata {
+                pc,
                 instruction,
                 opcode: read_opcode(line),
-            }
+            })
         })
         .collect()
 }
