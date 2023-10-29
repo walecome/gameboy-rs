@@ -227,8 +227,6 @@ pub struct Video {
 
     // internal
     current_dot: usize,
-    oam_access_allowed: bool,
-    vram_access_allowed: bool,
     frame_buffer: FrameBuffer,
     is_frame_ready: bool,
     last_line: usize,
@@ -250,8 +248,6 @@ impl Video {
             window_x: 0,
 
             current_dot: 0,
-            oam_access_allowed: true,
-            vram_access_allowed: true,
             frame_buffer: FrameBuffer::new(SCREEN_WIDTH as usize, SCREEN_HEIGHT as usize),
             is_frame_ready: true,
             last_line: 0,
@@ -314,19 +310,20 @@ impl Video {
                 if self.lcd_status.get_field(LcdStatusBit::Mode2IntSelect) {
                     todo!("Trigger STAT interrupt");
                 }
-                self.oam_access_allowed = false;
             }
 
             VideoMode::Mode3DrawPixels => {
-                self.vram_access_allowed = false;
+                // TODO: [1] specifies that VRAM / OAM is inaccessible during certain
+                //       modes, but disallowing access to VRAM (write in this case)
+                //       during Mode 3 breaks the boot rom logo. Figure out if we
+                //       need it.
+                // [1]: https://gbdev.io/pandocs/Rendering.html
             }
 
             VideoMode::Mode0HorizontalBlank => {
                 if self.lcd_status.get_field(LcdStatusBit::Mode0IntSelect) {
                     todo!("Trigger STAT interrupt");
                 }
-                self.oam_access_allowed = true;
-                self.vram_access_allowed = true;
             }
 
             VideoMode::Mode1VerticalBlank => {
@@ -357,37 +354,21 @@ impl Video {
     }
 
     pub fn write_vram(&mut self, address: Address, value: u8) {
-        if !self.vram_access_allowed {
-            // TODO: Log?
-            return;
-        }
         let index = address.index_value() - 0x8000;
         self.vram[index] = value;
     }
 
     pub fn read_vram(&self, address: Address) -> u8 {
-        if !self.vram_access_allowed {
-            // TODO: Log?
-            return 0xFF;
-        }
         let index = address.index_value() - 0x8000;
         self.vram[index]
     }
 
     pub fn write_oam(&mut self, address: Address, value: u8) {
-        if !self.oam_access_allowed {
-            // TODO: Log?
-            return;
-        }
         let _index = address.index_value() - 0xFE00;
         todo!("Write to OAM");
     }
 
     pub fn read_oam(&self, address: Address) -> u8 {
-        if !self.oam_access_allowed {
-            // TODO: Log?
-            return 0xFF;
-        }
         let _index = address.index_value() - 0xFE00;
         todo!("Read from OAM");
     }
