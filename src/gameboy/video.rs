@@ -61,7 +61,7 @@ impl LcdStatus {
     }
 
     fn read_as_byte(&self) -> u8 {
-        return self.data | self.ppu_mode as u8
+        return self.data | self.ppu_mode as u8;
     }
 
     fn write_as_byte(&mut self, value: u8) {
@@ -88,9 +88,7 @@ enum LcdControlBit {
 
 impl LcdControl {
     fn new() -> Self {
-        Self {
-            data: 0,
-        }
+        Self { data: 0 }
     }
 
     fn get_field(&self, field: LcdControlBit) -> bool {
@@ -169,7 +167,7 @@ pub struct RgbColor {
 
 impl RgbColor {
     fn new(r: u8, g: u8, b: u8) -> Self {
-        Self { r, g, b, }
+        Self { r, g, b }
     }
 
     fn new_gray(shade: u8) -> Self {
@@ -306,7 +304,7 @@ impl Video {
             VideoMode::Mode1VerticalBlank => {
                 self.is_frame_ready = true;
                 VideoMode::Mode2OamScan
-            },
+            }
         };
 
         self.lcd_status.set_ppu_mode(next_mode);
@@ -317,11 +315,11 @@ impl Video {
                     todo!("Trigger STAT interrupt");
                 }
                 self.oam_access_allowed = false;
-            },
+            }
 
             VideoMode::Mode3DrawPixels => {
                 self.vram_access_allowed = false;
-            },
+            }
 
             VideoMode::Mode0HorizontalBlank => {
                 if self.lcd_status.get_field(LcdStatusBit::Mode0IntSelect) {
@@ -329,14 +327,14 @@ impl Video {
                 }
                 self.oam_access_allowed = true;
                 self.vram_access_allowed = true;
-            },
+            }
 
             VideoMode::Mode1VerticalBlank => {
                 self.current_dot = self.current_dot % DOTS_PER_FRAME;
                 if self.lcd_status.get_field(LcdStatusBit::Mode1IntSelect) {
                     todo!("Trigger STAT interrupt");
                 }
-            },
+            }
         }
     }
 
@@ -350,16 +348,12 @@ impl Video {
                 // TODO: Calculate MODE 3 penalty
                 let elapsed_draw_pixels = point.x - DOTS_OAM_SCAN;
                 elapsed_draw_pixels >= MIN_DOTS_DRAW_PIXELS
-            },
+            }
 
-            VideoMode::Mode0HorizontalBlank => {
-                point.y > self.last_line
-            },
+            VideoMode::Mode0HorizontalBlank => point.y > self.last_line,
 
-            VideoMode::Mode1VerticalBlank => {
-                self.current_dot >= DOTS_PER_FRAME
-            },
-        }
+            VideoMode::Mode1VerticalBlank => self.current_dot >= DOTS_PER_FRAME,
+        };
     }
 
     pub fn write_vram(&mut self, address: Address, value: u8) {
@@ -387,7 +381,6 @@ impl Video {
         }
         let _index = address.index_value() - 0xFE00;
         todo!("Write to OAM");
-
     }
 
     pub fn read_oam(&self, address: Address) -> u8 {
@@ -398,7 +391,6 @@ impl Video {
         let _index = address.index_value() - 0xFE00;
         todo!("Read from OAM");
     }
-
 
     pub fn read_register(&self, select_byte: u8) -> u8 {
         match select_byte {
@@ -414,7 +406,7 @@ impl Video {
             0x49 => self.obj_palette_1.read_as_byte(),
             0x4A => self.window_y,
             0x4B => self.window_x,
-            _ => todo!()
+            _ => todo!(),
         }
     }
 
@@ -470,12 +462,9 @@ impl Video {
             let color = self.read_tile_pixel_color(tile_row_addr, x_in_tile, &self.bg_palette);
             self.frame_buffer.set_pixel(x, y, color);
         }
-
     }
 
-    fn draw_window_for_current_line(&mut self) {
-
-    }
+    fn draw_window_for_current_line(&mut self) {}
 
     fn resolve_tile_index(&self, x: u8, y: u8) -> u8 {
         // Background map is 256x256 pixels, i.e. 32x32 tiles (tiles are 8x8 pixel)
@@ -488,9 +477,7 @@ impl Video {
 
         let tile_addr_offset = (tile_y as u16) * 32 + tile_x as u16;
 
-        let tile_map_start_addr: u16 = if self.lcd_control.get_field(
-            LcdControlBit::BgTileMapArea,
-        ) {
+        let tile_map_start_addr: u16 = if self.lcd_control.get_field(LcdControlBit::BgTileMapArea) {
             0x9C00
         } else {
             0x9800
@@ -503,9 +490,10 @@ impl Video {
     fn resolve_tile_addr(&self, tile_index: u8) -> Address {
         let tile_byte_count: u16 = 16;
 
-        return if self.lcd_control.get_field(
-            LcdControlBit::BgAndWindowTileDataArea,
-        ) {
+        return if self
+            .lcd_control
+            .get_field(LcdControlBit::BgAndWindowTileDataArea)
+        {
             let tile_data_start = 0x8000;
             Address::new(tile_data_start + tile_byte_count * (tile_index as u16))
         } else {
@@ -516,13 +504,26 @@ impl Video {
         };
     }
 
-    fn read_tile_pixel_color(&self, tile_row_addr: Address, x_in_tile: u8, palette: &Palette) -> PaletteColor {
+    fn read_tile_pixel_color(
+        &self,
+        tile_row_addr: Address,
+        x_in_tile: u8,
+        palette: &Palette,
+    ) -> PaletteColor {
         assert!(x_in_tile < 8);
         let first_byte = self.read_vram(tile_row_addr);
         let second_byte = self.read_vram(tile_row_addr.next());
 
-        let ls_bit_color_id = if get_bit(first_byte, 7 - x_in_tile) { 1 } else { 0 };
-        let ms_bit_color_id = if get_bit(second_byte, 7 - x_in_tile) { 1 } else { 0 };
+        let ls_bit_color_id = if get_bit(first_byte, 7 - x_in_tile) {
+            1
+        } else {
+            0
+        };
+        let ms_bit_color_id = if get_bit(second_byte, 7 - x_in_tile) {
+            1
+        } else {
+            0
+        };
 
         let color_id = ms_bit_color_id << 1 | ls_bit_color_id;
 
