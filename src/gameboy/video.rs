@@ -457,7 +457,9 @@ impl Video {
 
             let x_in_tile = self.scx.wrapping_add(x) % 8;
             let y_in_tile = self.scy.wrapping_add(y) % 8;
-            let tile_row_addr = Address::new(tile_start_addr.value() + y_in_tile as u16);
+            let tile_row_byte_count: u16 = 2;
+            let tile_row_addr =
+                Address::new(tile_start_addr.value() + (y_in_tile as u16) * tile_row_byte_count);
 
             let color = self.read_tile_pixel_color(tile_row_addr, x_in_tile, &self.bg_palette);
             self.frame_buffer.set_pixel(x, y, color);
