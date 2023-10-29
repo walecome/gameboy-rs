@@ -118,11 +118,13 @@ pub enum Instruction {
     CbRr(CommonOperand),
     CbRl(CommonOperand),
     CbRlc(CommonOperand),
+    CbRrc(CommonOperand),
     CbBit { n: u8, target: CommonOperand },
     CbSwap(CommonOperand),
     Rra,
     Rla,
     Rlca,
+    Rrca,
     Adc(LogicalOpTarget),
     Sbc(LogicalOpTarget),
     Cpl,
@@ -558,6 +560,7 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
     match opcode {
         0x00 => Some(Instruction::Noop),
         0x07 => Some(Instruction::Rlca),
+        0x0F => Some(Instruction::Rrca),
         0x17 => Some(Instruction::Rla),
         0x1F => Some(Instruction::Rra),
         0x2F => Some(Instruction::Cpl),
@@ -576,6 +579,7 @@ pub fn decode_cb(opcode: u8) -> Option<Instruction> {
     let target = resolve_common_operand_from_col(opcode & 0xF);
     Some(match opcode {
         0x00..=0x07 => Instruction::CbRlc(target),
+        0x08..=0x0F => Instruction::CbRrc(target),
         0x10..=0x17 => Instruction::CbRl(target),
         0x18..=0x1F => Instruction::CbRr(target),
         0x38..=0x3F => Instruction::CbSrl(target),

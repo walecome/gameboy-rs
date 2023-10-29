@@ -250,9 +250,11 @@ impl CPU {
             Instruction::CbRr(target) => self.rr(target),
             Instruction::CbRl(target) => self.rl(target),
             Instruction::CbRlc(target) => self.rlc(target),
+            Instruction::CbRrc(target) => self.rrc(target),
             Instruction::Rra => self.rra(),
             Instruction::Rla => self.rla(),
             Instruction::Rlca => self.rlca(),
+            Instruction::Rrca => self.rrca(),
             Instruction::CbBit { n, target } => self.bit(n, target),
             Instruction::Adc(target) => self.adc(target),
             Instruction::Sbc(target) => self.sbc(target),
@@ -741,6 +743,11 @@ impl CPU {
         self.flag_register.set_z(false);
     }
 
+    fn rrca(&mut self) {
+        self.rrc(CommonOperand::Register(RegisterU8::A));
+        self.flag_register.set_z(false);
+    }
+
     fn srl(&mut self, target: CommonOperand) {
         self.apply_cb_target(target, |value| {
             let carry = value & 0x1 != 0;
@@ -803,6 +810,22 @@ impl CPU {
             let carry = get_bit(value, 7);
 
             let result = (value << 1) | if carry { 1 } else { 0 };
+
+            return (Some(result), FlagChange {
+                z: Some(result == 0),
+                n: Some(false),
+                h: Some(false),
+                c: Some(carry),
+            });
+        });
+    }
+
+    fn rrc(&mut self, target: CommonOperand) {
+        self.apply_cb_target(target, |value| {
+            let carry = get_bit(value, 0);
+            let carry_bit: u8 = if carry { 1 } else { 0 };
+
+            let result = (value >> 1) | (carry_bit << 7);
 
             return (Some(result), FlagChange {
                 z: Some(result == 0),
