@@ -249,8 +249,10 @@ impl CPU {
             Instruction::CbSrl(target) => self.srl(target),
             Instruction::CbRr(target) => self.rr(target),
             Instruction::CbRl(target) => self.rl(target),
+            Instruction::CbRlc(target) => self.rlc(target),
             Instruction::Rra => self.rra(),
             Instruction::Rla => self.rla(),
+            Instruction::Rlca => self.rlca(),
             Instruction::CbBit { n, target } => self.bit(n, target),
             Instruction::Adc(target) => self.adc(target),
             Instruction::JumpAddressHL => {
@@ -713,6 +715,11 @@ impl CPU {
         self.flag_register.set_z(false);
     }
 
+    fn rlca(&mut self) {
+        self.rlc(CbTarget::Register(RegisterU8::A));
+        self.flag_register.set_z(false);
+    }
+
     fn srl(&mut self, target: CbTarget) {
         self.apply_cb_target(target, |value| {
             let carry = value & 0x1 != 0;
@@ -766,6 +773,21 @@ impl CPU {
                 n: Some(false),
                 h: Some(false),
                 c: Some(new_carry),
+            });
+        });
+    }
+
+    fn rlc(&mut self, target: CbTarget) {
+        self.apply_cb_target(target, |value| {
+            let carry = get_bit(value, 7);
+
+            let result = (value << 1) | if carry { 1 } else { 0 };
+
+            return (Some(result), FlagChange {
+                z: Some(result == 0),
+                n: Some(false),
+                h: Some(false),
+                c: Some(carry),
             });
         });
     }
