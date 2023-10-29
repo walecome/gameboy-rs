@@ -265,6 +265,7 @@ impl CPU {
             }
             Instruction::CbSwap(target) => self.swap(target),
             Instruction::Cpl => self.cpl(),
+            Instruction::Scf => self.scf(),
         }
 
         return Some(match (self.did_take_conditional_branch, opcode_type) {
@@ -845,6 +846,15 @@ impl CPU {
             n: Some(true),
             h: Some(true),
             c: None,
+        });
+    }
+
+    fn scf(&mut self) {
+        self.apply_flag_change(FlagChange {
+            z: None,
+            n: Some(false),
+            h: Some(false),
+            c: Some(true),
         });
     }
 

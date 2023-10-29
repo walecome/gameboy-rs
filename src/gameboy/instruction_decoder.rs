@@ -126,6 +126,7 @@ pub enum Instruction {
     Adc(LogicalOpTarget),
     Sbc(LogicalOpTarget),
     Cpl,
+    Scf,
 }
 
 fn resolve_common_operand_from_col(col: u8) -> CommonOperand {
@@ -559,6 +560,7 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
         0x17 => Some(Instruction::Rla),
         0x1F => Some(Instruction::Rra),
         0x2F => Some(Instruction::Cpl),
+        0x37 => Some(Instruction::Scf),
         0x76 => Some(Instruction::Halt),
         0xE9 => Some(Instruction::JumpAddressHL),
         0xF3 => Some(Instruction::DisableInterrupts),
