@@ -589,7 +589,13 @@ pub fn decode_cb(opcode: u8) -> Option<Instruction> {
         0x38..=0x3F => Instruction::CbSrl(target),
         0x30..=0x37 => Instruction::CbSwap(target),
         0x40..=0x47 => Instruction::CbBit { n: 0, target, },
+        0x48..=0x4F => Instruction::CbBit { n: 1, target, },
+        0x50..=0x57 => Instruction::CbBit { n: 2, target, },
+        0x58..=0x5F => Instruction::CbBit { n: 3, target, },
+        0x60..=0x67 => Instruction::CbBit { n: 4, target, },
+        0x68..=0x6F => Instruction::CbBit { n: 5, target, },
         0x70..=0x7C => Instruction::CbBit { n: 6, target, },
+        0x78..=0x7F => Instruction::CbBit { n: 7, target, },
         _ => return None,
     })
 }
