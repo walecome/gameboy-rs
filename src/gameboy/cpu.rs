@@ -224,6 +224,7 @@ impl CPU {
             Instruction::Halt => return None,
             Instruction::JumpImmediate(condition) => self.jump_immediate(condition),
             Instruction::DisableInterrupts => self.interrupts_enabled = false,
+            Instruction::EnableInterrupts => self.interrupts_enabled = true,
             Instruction::LoadU16 { dst, src } => {
                 let value = self.read_u16_target(src);
                 self.write_u16_target(dst, value);

@@ -97,6 +97,7 @@ pub enum Instruction {
     JumpImmediate(Option<FlagCondition>),
     JumpAddressHL,
     DisableInterrupts,
+    EnableInterrupts,
     Call(Option<FlagCondition>),
     JumpRelative(Option<FlagCondition>),
     Ret(Option<FlagCondition>),
@@ -521,6 +522,7 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
         0x76 => Some(Instruction::Halt),
         0xE9 => Some(Instruction::JumpAddressHL),
         0xF3 => Some(Instruction::DisableInterrupts),
+        0xFB => Some(Instruction::EnableInterrupts),
         _ => None,
     }
 }
