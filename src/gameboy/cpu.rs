@@ -723,7 +723,7 @@ impl CPU {
         let result = self.a.wrapping_sub(value);
 
         let nibble_a = self.a & 0xF;
-        let nibble_value = self.a & 0xF;
+        let nibble_value = value & 0xF;
 
         self.apply_flag_change(FlagChange {
             z: Some(result == 0),
