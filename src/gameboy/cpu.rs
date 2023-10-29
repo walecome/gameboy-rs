@@ -5,7 +5,7 @@ use crate::gameboy::instruction_decoder::decode_cb;
 use super::cartridge::Cartridge;
 use super::instruction_decoder::{
     decode, FlagCondition, IncDecU8Target, Instruction, LoadDstU16, LoadDstU8, LoadSrcU16,
-    LoadSrcU8, LogicalOpTarget, RegisterU16, RegisterU8, U16Target, CbTarget,
+    LoadSrcU8, LogicalOpTarget, RegisterU16, RegisterU8, U16Target, CommonOperand,
 };
 
 use super::mmu::{MMU, Word};
@@ -706,21 +706,21 @@ impl CPU {
     }
 
     fn rra(&mut self) {
-        self.rr(CbTarget::Register(RegisterU8::A));
+        self.rr(CommonOperand::Register(RegisterU8::A));
         self.flag_register.set_z(false);
     }
 
     fn rla(&mut self) {
-        self.rl(CbTarget::Register(RegisterU8::A));
+        self.rl(CommonOperand::Register(RegisterU8::A));
         self.flag_register.set_z(false);
     }
 
     fn rlca(&mut self) {
-        self.rlc(CbTarget::Register(RegisterU8::A));
+        self.rlc(CommonOperand::Register(RegisterU8::A));
         self.flag_register.set_z(false);
     }
 
-    fn srl(&mut self, target: CbTarget) {
+    fn srl(&mut self, target: CommonOperand) {
         self.apply_cb_target(target, |value| {
             let carry = value & 0x1 != 0;
 
@@ -735,7 +735,7 @@ impl CPU {
         });
     }
 
-    fn rr(&mut self, target: CbTarget) {
+    fn rr(&mut self, target: CommonOperand) {
         let old_carry = self.flag_register.get_c();
 
         self.apply_cb_target(target, |value| {
@@ -756,7 +756,7 @@ impl CPU {
         });
     }
 
-    fn rl(&mut self, target: CbTarget) {
+    fn rl(&mut self, target: CommonOperand) {
         let old_carry = self.flag_register.get_c();
 
         self.apply_cb_target(target, |value| {
@@ -777,7 +777,7 @@ impl CPU {
         });
     }
 
-    fn rlc(&mut self, target: CbTarget) {
+    fn rlc(&mut self, target: CommonOperand) {
         self.apply_cb_target(target, |value| {
             let carry = get_bit(value, 7);
 
@@ -792,7 +792,7 @@ impl CPU {
         });
     }
 
-    fn bit(&mut self, n: u8, target: CbTarget) {
+    fn bit(&mut self, n: u8, target: CommonOperand) {
         self.apply_cb_target(target, |value| {
             let z = value & (1 << n) != 0;
 
@@ -805,7 +805,7 @@ impl CPU {
         });
     }
 
-    fn swap(&mut self, target: CbTarget) {
+    fn swap(&mut self, target: CommonOperand) {
         self.apply_cb_target(target, |value| {
             let result = swap_nibbles(value);
 
@@ -818,12 +818,12 @@ impl CPU {
         });
     }
 
-    fn apply_cb_target(&mut self, target: CbTarget, applier: impl Fn(u8) -> (Option<u8>, FlagChange)) {
+    fn apply_cb_target(&mut self, target: CommonOperand, applier: impl Fn(u8) -> (Option<u8>, FlagChange)) {
         let value: u8 = match target {
-            CbTarget::Register(reg) => {
+            CommonOperand::Register(reg) => {
                 *self.resolve_u8_reg(reg)
             },
-            CbTarget::AddressHL => {
+            CommonOperand::AddressHL => {
                 let address = Address::new(self.hl());
                 self.mmu.read(address)
             }
@@ -835,10 +835,10 @@ impl CPU {
 
         if let Some(result) = maybe_result {
             match target {
-                CbTarget::Register(reg) => {
+                CommonOperand::Register(reg) => {
                     *self.resolve_u8_reg(reg) = result;
                 },
-                CbTarget::AddressHL => {
+                CommonOperand::AddressHL => {
                     let address = Address::new(self.hl());
                     self.mmu.write(address, result);
                 }
@@ -866,10 +866,12 @@ impl CPU {
 
     fn resolve_logical_op_target(&mut self, target: LogicalOpTarget) -> u8 {
         match target {
-            LogicalOpTarget::Register(reg) => *self.resolve_u8_reg(reg),
-            LogicalOpTarget::AddressHL => {
-                let addr = self.resolve_u16_reg(&RegisterU16::HL).get();
-                self.mmu.read(Address::new(addr))
+            LogicalOpTarget::Common(operand) => match operand {
+                CommonOperand::Register(reg) => *self.resolve_u8_reg(reg),
+                CommonOperand::AddressHL => {
+                    let addr = self.resolve_u16_reg(&RegisterU16::HL).get();
+                    self.mmu.read(Address::new(addr))
+                }
             }
             LogicalOpTarget::ImmediateU8 => self.read_u8(),
         }

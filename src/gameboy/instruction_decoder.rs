@@ -76,16 +76,15 @@ pub enum U16Target {
 }
 
 #[derive(Debug)]
-pub enum LogicalOpTarget {
+pub enum CommonOperand {
     Register(RegisterU8),
     AddressHL,
-    ImmediateU8,
 }
 
 #[derive(Debug)]
-pub enum CbTarget {
-    Register(RegisterU8),
-    AddressHL,
+pub enum LogicalOpTarget {
+    Common(CommonOperand),
+    ImmediateU8,
 }
 
 #[derive(Debug)]
@@ -115,16 +114,35 @@ pub enum Instruction {
     AddU8(LogicalOpTarget),
     AddU16(U16Target),
     Sub(LogicalOpTarget),
-    CbSrl(CbTarget),
-    CbRr(CbTarget),
-    CbRl(CbTarget),
-    CbRlc(CbTarget),
-    CbBit { n: u8, target: CbTarget },
-    CbSwap(CbTarget),
+    CbSrl(CommonOperand),
+    CbRr(CommonOperand),
+    CbRl(CommonOperand),
+    CbRlc(CommonOperand),
+    CbBit { n: u8, target: CommonOperand },
+    CbSwap(CommonOperand),
     Rra,
     Rla,
     Rlca,
     Adc(LogicalOpTarget),
+}
+
+fn resolve_common_operand_from_col(col: u8) -> CommonOperand {
+    let offset_col = if col < 0x8 {
+        col
+    } else {
+        col - 0x8
+    };
+    match offset_col {
+        0x0 => CommonOperand::Register(RegisterU8::B),
+        0x1 => CommonOperand::Register(RegisterU8::C),
+        0x2 => CommonOperand::Register(RegisterU8::D),
+        0x3 => CommonOperand::Register(RegisterU8::E),
+        0x4 => CommonOperand::Register(RegisterU8::H),
+        0x5 => CommonOperand::Register(RegisterU8::L),
+        0x6 => CommonOperand::AddressHL,
+        0x7 => CommonOperand::Register(RegisterU8::A),
+        _ => panic!("Invalid offset column: {}", offset_col),
+    }
 }
 
 fn try_decode_u8_load_src(row_mask: u8, col_mask: u8) -> Option<LoadSrcU8> {
@@ -329,7 +347,10 @@ fn try_decode_inc_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_or_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0xB0..=0xB7 => Instruction::Or(resolve_logical_op_target(opcode & 0xF)),
+        0xB0..=0xB7 => {
+            let operand = resolve_common_operand_from_col(opcode & 0xF);
+            Instruction::Or(LogicalOpTarget::Common(operand))
+        },
         0xF6 => Instruction::Or(LogicalOpTarget::ImmediateU8),
         _ => return None,
     })
@@ -337,7 +358,10 @@ fn try_decode_or_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_compare_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0xB8..=0xBF => Instruction::Compare(resolve_logical_op_target(opcode & 0xF)),
+        0xB8..=0xBF => {
+            let operand = resolve_common_operand_from_col(opcode & 0xF);
+            Instruction::Compare(LogicalOpTarget::Common(operand))
+        },
         0xFE => Instruction::Compare(LogicalOpTarget::ImmediateU8),
         _ => return None,
     })
@@ -345,7 +369,10 @@ fn try_decode_compare_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_and_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0xA0..=0xA7 => Instruction::And(resolve_logical_op_target(opcode & 0xF)),
+        0xA0..=0xA7 => {
+            let operand = resolve_common_operand_from_col(opcode & 0xF);
+            Instruction::And(LogicalOpTarget::Common(operand))
+        },
         0xE6 => Instruction::And(LogicalOpTarget::ImmediateU8),
         _ => return None,
     })
@@ -374,7 +401,10 @@ fn try_decode_dec_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_xor_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0xA8..=0xAF => Instruction::Xor(resolve_logical_op_target(opcode & 0xF)),
+        0xA8..=0xAF => {
+            let operand = resolve_common_operand_from_col(opcode & 0xF);
+            Instruction::Xor(LogicalOpTarget::Common(operand))
+        },
         0xEE => Instruction::Xor(LogicalOpTarget::ImmediateU8),
         _ => return None,
     })
@@ -390,7 +420,10 @@ fn try_decode_add_instruction(opcode: u8) -> Option<Instruction> {
 
         0xE8 => Instruction::AddStackPointer,
 
-        0x80..=0x87 => Instruction::AddU8(resolve_logical_op_target(opcode & 0xF)),
+        0x80..=0x87 => {
+            let operand = resolve_common_operand_from_col(opcode & 0xF);
+            Instruction::AddU8(LogicalOpTarget::Common(operand))
+        }
 
         0xC6 => Instruction::AddU8(LogicalOpTarget::ImmediateU8),
         _ => return None,
@@ -399,7 +432,10 @@ fn try_decode_add_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_sub_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0x90..=0x97 => Instruction::Sub(resolve_logical_op_target(opcode & 0xF)),
+        0x90..=0x97 => {
+            let operand = resolve_common_operand_from_col(opcode & 0xF);
+            Instruction::Sub(LogicalOpTarget::Common(operand))
+        },
         0xD6 => Instruction::Sub(LogicalOpTarget::ImmediateU8),
         _ => return None,
     })
@@ -407,7 +443,10 @@ fn try_decode_sub_instruction(opcode: u8) -> Option<Instruction> {
 
 fn try_decode_adc_instruction(opcode: u8) -> Option<Instruction> {
     Some(match opcode {
-        0x88..=0x8F => Instruction::Adc(resolve_logical_op_target(opcode & 0xF)),
+        0x88..=0x8F => {
+            let operand = resolve_common_operand_from_col(opcode & 0xF);
+            Instruction::Adc(LogicalOpTarget::Common(operand))
+        },
         0xCE => Instruction::Adc(LogicalOpTarget::ImmediateU8),
         _ => return None,
     })
@@ -424,26 +463,6 @@ fn try_decode_jp_instruction(opcode: u8) -> Option<Instruction> {
         0xDA => Instruction::JumpImmediate(Some(FlagCondition::C)),
         _ => return None,
     })
-}
-
-fn resolve_logical_op_target(col: u8) -> LogicalOpTarget{
-
-    let offset_col = if col < 0x8 {
-        col
-    } else {
-        col - 0x8
-    };
-    match offset_col {
-        0x0 => LogicalOpTarget::Register(RegisterU8::B),
-        0x1 => LogicalOpTarget::Register(RegisterU8::C),
-        0x2 => LogicalOpTarget::Register(RegisterU8::D),
-        0x3 => LogicalOpTarget::Register(RegisterU8::E),
-        0x4 => LogicalOpTarget::Register(RegisterU8::H),
-        0x5 => LogicalOpTarget::Register(RegisterU8::L),
-        0x6 => LogicalOpTarget::AddressHL,
-        0x7 => LogicalOpTarget::Register(RegisterU8::A),
-        _ => panic!("Invalid offset column: {}", offset_col),
-    }
 }
 
 // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
@@ -530,28 +549,9 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
     }
 }
 
-fn resolve_cb_target(col: u8) -> CbTarget {
-    let offset_col = if col < 0x8 {
-        col
-    } else {
-        col - 0x8
-    };
-    match offset_col {
-        0x0 => CbTarget::Register(RegisterU8::B),
-        0x1 => CbTarget::Register(RegisterU8::C),
-        0x2 => CbTarget::Register(RegisterU8::D),
-        0x3 => CbTarget::Register(RegisterU8::E),
-        0x4 => CbTarget::Register(RegisterU8::H),
-        0x5 => CbTarget::Register(RegisterU8::L),
-        0x6 => CbTarget::AddressHL,
-        0x7 => CbTarget::Register(RegisterU8::A),
-        _ => panic!("Invalid offset column: {}", offset_col),
-    }
-}
-
 // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 pub fn decode_cb(opcode: u8) -> Option<Instruction> {
-    let target = resolve_cb_target(opcode & 0xF);
+    let target = resolve_common_operand_from_col(opcode & 0xF);
     Some(match opcode {
         0x00..=0x07 => Instruction::CbRlc(target),
         0x10..=0x17 => Instruction::CbRl(target),
