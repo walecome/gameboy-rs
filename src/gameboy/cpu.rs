@@ -298,12 +298,16 @@ impl CPU {
             Instruction::Daa => self.daa(),
         }
 
-        return Some(match (self.did_take_conditional_branch, opcode_type) {
+        let elapsed_cycles = match (self.did_take_conditional_branch, opcode_type) {
             (false, OpcodeType::Normal) => cycles::NORMAL_OPCODE_CYCLES[opcode as usize],
             (false, OpcodeType::Cb) => cycles::CB_OPCODE_CYCLES[opcode as usize],
             (true, OpcodeType::Normal) => cycles::NORMAL_OPCODE_CYCLES_BRANCED[opcode as usize],
             (true, OpcodeType::Cb) => unreachable!("CB opcodes shouldn't branch"),
-        });
+        };
+
+        self.mmu.maybe_tick_timers(elapsed_cycles);
+
+        return Some(elapsed_cycles);
     }
 
     pub fn mmu(&mut self) -> &mut MMU {

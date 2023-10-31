@@ -50,7 +50,7 @@ impl Word {
 pub struct IO {
     joypad_input: u8,
     serial_transfer: (u8, u8),
-    timer_and_divider: Vec<u8>,
+    timer: Timer,
     audio: Vec<u8>,
     wave_pattern: Vec<u8>,
     boot_rom_disabled: u8,
@@ -69,7 +69,7 @@ impl IO {
         Self {
             joypad_input: 0x00,
             serial_transfer: (0x00, 0x00),
-            timer_and_divider: byte_vec_for_range(0xFF00, 0xFF07),
+            timer: Timer::new(),
             audio: byte_vec_for_range(0xFF10, 0xFF26),
             wave_pattern: byte_vec_for_range(0xFF30, 0xFF3F),
             boot_rom_disabled: 0x00,
@@ -103,6 +103,102 @@ pub fn interrupt_vector(interrupt: InterruptSource) -> u8 {
         InterruptSource::Timer => 0x50,
         InterruptSource::Serial => 0x58,
         InterruptSource::Joypad => 0x60,
+    }
+}
+
+struct Timer {
+    divider: u8,
+    timer_counter: u8,
+    timer_modulo: u8,
+    timer_control: u8,
+
+    // Internal
+    clock_counter: usize,
+}
+
+#[derive(Copy, Clone)]
+enum ClockSelect {
+    Div1024 = 1024,
+    Div16 = 16,
+    Div64 = 64,
+    Div256 = 245,
+}
+
+impl Timer {
+    fn new() -> Self {
+        Self {
+            divider: 0,
+            timer_counter: 0,
+            timer_modulo: 0,
+            timer_control: 0,
+            clock_counter: 0,
+        }
+    }
+
+    fn read(&self, address: Address) -> u8 {
+        match address.value() {
+            0xFF04 => self.divider,
+            0xFF05 => self.timer_counter,
+            0xFF06 => self.timer_modulo,
+            0xFF07 => self.timer_control,
+            _ => panic!("Invalid timer address: {:#06X}", address.value()),
+        }
+    }
+
+    fn write(&mut self, address: Address, value: u8) {
+        match address.value() {
+            // Writing any value to this register resets it to $00.
+            // https://gbdev.io/pandocs/Timer_and_Divider_Registers.html#ff04--div-divider-register
+            0xFF04 => self.divider = 0,
+            0xFF05 => self.timer_counter = value,
+            0xFF06 => self.timer_modulo = value,
+            0xFF07 => {
+                self.timer_control = value;
+            }
+            _ => panic!("Invalid timer address: {:#06X}", address.value()),
+        }
+    }
+
+    fn maybe_tick(&mut self, elapsed_cycles: u8) -> bool {
+        // TODO: This doesn't pass the test
+        // https://gbdev.io/pandocs/Timer_Obscure_Behaviour.html#timer-overflow-behaviour
+        self.clock_counter += elapsed_cycles as usize;
+
+        let clock_select_div = self.get_clock_select() as usize;
+        let should_increment_timer = self.is_timer_enabled() && self.clock_counter > clock_select_div;
+        self.clock_counter %= clock_select_div;
+
+        if should_increment_timer {
+            let fire_interrupt = self.increment_timer_counter();
+            return fire_interrupt;
+        }
+
+        return false;
+    }
+
+    fn get_clock_select(&self) -> ClockSelect {
+        match self.timer_control & 0b11 {
+            0b00 => ClockSelect::Div1024,
+            0b01 => ClockSelect::Div16,
+            0b10 => ClockSelect::Div64,
+            0b11 => ClockSelect::Div256,
+            _ => panic!(),
+        }
+    }
+
+    fn increment_timer_counter(&mut self) -> bool{
+        self.timer_counter = self.timer_counter.wrapping_add(1);
+
+        if self.timer_counter == 0x00 {
+            self.timer_counter = self.timer_modulo;
+            return true;
+        }
+
+        return false;
+    }
+
+    fn is_timer_enabled(&self) -> bool {
+        get_bit(self.timer_control, 2)
     }
 }
 
@@ -193,6 +289,12 @@ impl MMU {
         set_bit_mut(&mut self.interrupt_flags, interrupt as u8, enabled);
     }
 
+    pub fn maybe_tick_timers(&mut self, elapsed_cycles: u8) {
+        if self.io.timer.maybe_tick(elapsed_cycles) {
+            self.set_interrupt_flag(InterruptSource::Timer, true);
+        }
+    }
+
     fn read_io(&self, address: Address) -> u8 {
         let select_byte: u8 = match address.value() {
             0xFF00..=0xFF70 => (address.value() & 0xFF) as u8,
@@ -203,7 +305,7 @@ impl MMU {
             0x00 => self.io.joypad_input,
             0x01 => self.io.serial_transfer.0,
             0x02 => self.io.serial_transfer.1,
-            0x04..=0x07 => self.io.timer_and_divider[(select_byte - 0x04) as usize],
+            0x04..=0x07 => self.io.timer.read(address),
             0x10..=0x26 => self.io.audio[(select_byte - 0x10) as usize],
             0x30..=0x3F => self.io.wave_pattern[(select_byte - 0x30) as usize],
             0x40..=0x45 => self.video.read_register(select_byte),
@@ -228,7 +330,7 @@ impl MMU {
             0x00 => self.io.joypad_input = value,
             0x01 => self.io.serial_transfer.0 = value,
             0x02 => self.io.serial_transfer.1 = value,
-            0x04..=0x07 => self.io.timer_and_divider[(select_byte - 0x04) as usize] = value,
+            0x04..=0x07 => self.io.timer.write(address, value),
             0x10..=0x26 => self.io.audio[(select_byte - 0x10) as usize] = value,
             0x30..=0x3F => self.io.wave_pattern[(select_byte - 0x30) as usize] = value,
             0x40..=0x45 => self.video.write_register(select_byte, value),
