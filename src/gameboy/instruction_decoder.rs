@@ -616,6 +616,5 @@ pub fn decode_cb(opcode: u8) -> Option<Instruction> {
         0xE8..=0xEF => Instruction::CbSet { n: 5, target, },
         0xF0..=0xFC => Instruction::CbSet { n: 6, target, },
         0xF8..=0xFF => Instruction::CbSet { n: 7, target, },
-        _ => return None,
     })
 }
