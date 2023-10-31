@@ -1,6 +1,7 @@
 use super::address::Address;
 use super::cartridge::Cartridge;
 use super::video::Video;
+use super::utils::{get_bit, set_bit_mut};
 
 pub struct Word {
     pub value: u16,
@@ -86,6 +87,25 @@ pub struct MMU {
     interrupt_flags: u8,
 }
 
+#[derive(Copy, Clone)]
+pub enum InterruptSource {
+    VBlank = 0,
+    Lcd = 1,
+    Timer = 2,
+    Serial = 3,
+    Joypad = 4,
+}
+
+pub fn interrupt_vector(interrupt: InterruptSource) -> u8 {
+    match interrupt {
+        InterruptSource::VBlank => 0x40,
+        InterruptSource::Lcd => 0x48,
+        InterruptSource::Timer => 0x50,
+        InterruptSource::Serial => 0x58,
+        InterruptSource::Joypad => 0x60,
+    }
+}
+
 impl MMU {
     pub fn new(cartridge: Box<dyn Cartridge>) -> MMU {
         MMU {
@@ -161,6 +181,17 @@ impl MMU {
         self.write(address.next(), value.high());
     }
 
+    pub fn is_interrupt_enabled(&self, interrupt: InterruptSource) -> bool {
+        get_bit(self.interrupt_enable, interrupt as u8)
+    }
+
+    pub fn has_interrupt_flag(&self, interrupt: InterruptSource) -> bool {
+        get_bit(self.interrupt_flags, interrupt as u8)
+    }
+
+    pub fn set_interrupt_flag(&mut self, interrupt: InterruptSource, enabled: bool) {
+        set_bit_mut(&mut self.interrupt_flags, interrupt as u8, enabled);
+    }
 
     fn read_io(&self, address: Address) -> u8 {
         let select_byte: u8 = match address.value() {

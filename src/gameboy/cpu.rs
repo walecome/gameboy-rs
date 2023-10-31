@@ -8,7 +8,7 @@ use super::instruction_decoder::{
     LoadSrcU8, LogicalOpTarget, RegisterU16, RegisterU8, U16Target, CommonOperand,
 };
 
-use super::mmu::{MMU, Word};
+use super::mmu::{MMU, Word, InterruptSource, interrupt_vector};
 use super::address::Address;
 use super::utils::{get_bit, set_bit};
 
@@ -223,6 +223,8 @@ impl CPU {
     }
 
     pub fn tick(&mut self, maybe_metadata: Option<&ReferenceMetadata>, i: usize) -> Option<u8> {
+        self.maybe_process_interrupts();
+
         self.did_take_conditional_branch = false;
 
         let pc = self.pc;
@@ -306,6 +308,56 @@ impl CPU {
 
     pub fn mmu(&mut self) -> &mut MMU {
         &mut self.mmu
+    }
+
+    fn maybe_process_interrupts(&mut self) {
+        if !self.interrupts_enabled {
+            return;
+        }
+
+        let interrupt_per_priority: &[InterruptSource] = &[
+            InterruptSource::VBlank,
+            InterruptSource::Lcd,
+            InterruptSource::Timer,
+            InterruptSource::Serial,
+            InterruptSource::Joypad,
+        ];
+
+        for interrupt in interrupt_per_priority {
+            if self.maybe_handle_interrupt(*interrupt) {
+                return;
+            }
+        }
+    }
+
+    // https://gbdev.io/pandocs/Interrupts.html#interrupt-handling
+    fn maybe_handle_interrupt(&mut self, interrupt: InterruptSource) -> bool {
+        if !self.should_fire_interrupt(interrupt) {
+            return false;
+        }
+
+        // The IF bit corresponding to this interrupt and the IME flag are reset by the CPU.
+        self.interrupts_enabled = false;
+        self.mmu.set_interrupt_flag(interrupt, false);
+
+        // The corresponding interrupt handler is called by the CPU.
+
+
+        // Two wait states are executed (2 M-cycles pass while nothing happens;
+        // presumably the CPU is executing nops during this time).
+
+        // The current value of the PC register is pushed onto the stack, consuming 2 more M-cycles.
+        self.stack_push(self.pc);
+        // The PC register is set to the address of the handler
+        self.pc = interrupt_vector(interrupt) as u16;
+
+        // TODO: This should last 5 M-cycles, do we need to indicate that?
+
+        return true;
+    }
+
+    fn should_fire_interrupt(&self, interrupt: InterruptSource) -> bool {
+        self.mmu.is_interrupt_enabled(interrupt) && self.mmu.has_interrupt_flag(interrupt)
     }
 
     fn next_instruction(&mut self) -> (Instruction, OpcodeType, u8) {
