@@ -160,12 +160,10 @@ impl Timer {
     }
 
     fn maybe_tick(&mut self, elapsed_cycles: u8) -> bool {
-        // TODO: This doesn't pass the test
-        // https://gbdev.io/pandocs/Timer_Obscure_Behaviour.html#timer-overflow-behaviour
-        self.clock_counter += elapsed_cycles as usize;
+        self.clock_counter += (elapsed_cycles as usize) * 4;
 
         let clock_select_div = self.get_clock_select() as usize;
-        let should_increment_timer = self.is_timer_enabled() && self.clock_counter > clock_select_div;
+        let should_increment_timer = self.is_timer_enabled() && self.clock_counter >= clock_select_div;
         self.clock_counter %= clock_select_div;
 
         if should_increment_timer {
