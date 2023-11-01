@@ -293,6 +293,10 @@ impl MMU {
         }
     }
 
+    pub fn boot_rom_disabled(&self) -> bool {
+        self.io.boot_rom_disabled != 0
+    }
+
     fn read_io(&self, address: Address) -> u8 {
         let select_byte: u8 = match address.value() {
             0xFF00..=0xFF70 => (address.value() & 0xFF) as u8,

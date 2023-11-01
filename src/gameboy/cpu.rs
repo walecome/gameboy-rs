@@ -2,6 +2,8 @@ use std::fmt;
 
 use crate::gameboy::instruction_decoder::decode_cb;
 
+use clap::ValueEnum;
+
 use super::cartridge::Cartridge;
 use super::instruction_decoder::{
     decode, FlagCondition, IncDecU8Target, Instruction, LoadDstU16, LoadDstU8, LoadSrcU16,
@@ -15,6 +17,13 @@ use super::utils::{get_bit, set_bit};
 use super::reference::ReferenceMetadata;
 
 use super::cycles;
+
+#[derive(Copy, Clone, ValueEnum)]
+pub enum TraceMode {
+    Off,
+    WithBoot,
+    WithoutBoot,
+}
 
 struct RegisterPair<'a> {
     high: &'a mut u8,
@@ -154,7 +163,7 @@ pub struct CPU {
 
     // Debug
     depth: usize,
-    trace_cpu: bool,
+    trace_mode: TraceMode,
 }
 
 impl fmt::Debug for CPU {
@@ -203,7 +212,7 @@ enum OpcodeType {
 }
 
 impl CPU {
-    pub fn new(cartridge: Box<dyn Cartridge>, trace_cpu: bool) -> CPU {
+    pub fn new(cartridge: Box<dyn Cartridge>, trace_mode: TraceMode) -> CPU {
         CPU {
             pc: 0x0000,
             sp: 0x0FFFE,
@@ -220,7 +229,7 @@ impl CPU {
             did_take_conditional_branch: false,
             halted: false,
             depth: 0,
-            trace_cpu,
+            trace_mode,
         }
     }
 
@@ -237,7 +246,13 @@ impl CPU {
         let pc = self.pc;
         let (instruction, opcode_type, opcode) = self.next_instruction();
 
-        if self.trace_cpu {
+        let should_trace = match self.trace_mode {
+            TraceMode::Off => false,
+            TraceMode::WithBoot => true,
+            TraceMode::WithoutBoot => self.mmu.boot_rom_disabled(),
+        };
+
+        if should_trace {
             print!("{:.<1$}", "", 1 * self.depth);
             println!("{:#06X}: {:#04X} ({:?})", pc, opcode, instruction);
         }

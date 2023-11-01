@@ -2,13 +2,13 @@ mod gameboy;
 
 use std::{fs, path::PathBuf};
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 
 use gameboy::header::Header;
 use gameboy::video::FrameBuffer;
 
 use crate::gameboy::cartridge::create_for_cartridge_type;
-use crate::gameboy::cpu::CPU;
+use crate::gameboy::cpu::{CPU, TraceMode};
 use crate::gameboy::reference::{get_reference_metadata, ReferenceMetadata};
 use crate::gameboy::video::{RgbColor, SCREEN_HEIGHT, SCREEN_WIDTH};
 
@@ -25,7 +25,8 @@ struct Args {
     #[arg(long)]
     reference: Option<PathBuf>,
     #[arg(long)]
-    trace_cpu: bool,
+    #[arg(value_enum, default_value_t=TraceMode::Off)]
+    trace_mode: TraceMode,
 }
 
 struct Gameboy {
@@ -51,7 +52,7 @@ impl Gameboy {
         };
 
         Self {
-            cpu: CPU::new(cartridge, args.trace_cpu),
+            cpu: CPU::new(cartridge, args.trace_mode),
 
             index: 0,
             maybe_reference_metadata: if let Some(reference) = args.reference {
