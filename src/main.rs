@@ -62,7 +62,7 @@ impl Gameboy {
         }
     }
 
-    fn tick(&mut self) -> bool {
+    fn tick(&mut self) {
         let current_metadata = if let Some(reference_metadata) = &self.maybe_reference_metadata {
             if self.index >= reference_metadata.len() {
                 panic!("Ran out of reference data");
@@ -71,20 +71,9 @@ impl Gameboy {
         } else {
             None
         };
-        let maybe_cycles = self.cpu.tick(current_metadata, self.index);
-        match maybe_cycles {
-            Some(cycles) => {
-                self.cpu.mmu().video().tick(cycles as usize);
-            }
-            None => {
-                println!("HALT!");
-                return false;
-            }
-        }
-
+        let cycles = self.cpu.tick(current_metadata, self.index);
+        self.cpu.mmu().video().tick(cycles as usize);
         self.index += 1;
-
-        return true;
     }
 
     fn try_take_frame(&mut self) -> Option<&FrameBuffer> {
@@ -139,9 +128,7 @@ fn main() -> Result<(), String> {
     let mut event_pump = sdl_context.event_pump()?;
 
     'running: loop {
-        if !gameboy.tick() {
-            break 'running;
-        }
+        gameboy.tick();
 
         if let Some(frame_buffer) = gameboy.try_take_frame() {
             for event in event_pump.poll_iter() {

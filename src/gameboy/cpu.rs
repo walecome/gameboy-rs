@@ -150,6 +150,7 @@ pub struct CPU {
     interrupts_enabled: bool,
     flag_register: FlagRegister,
     did_take_conditional_branch: bool,
+    halted: bool,
 
     // Debug
     depth: usize,
@@ -217,13 +218,19 @@ impl CPU {
             interrupts_enabled: false,
             flag_register: FlagRegister::new(),
             did_take_conditional_branch: false,
+            halted: false,
             depth: 0,
             trace_cpu,
         }
     }
 
-    pub fn tick(&mut self, maybe_metadata: Option<&ReferenceMetadata>, i: usize) -> Option<u8> {
+    pub fn tick(&mut self, maybe_metadata: Option<&ReferenceMetadata>, i: usize) -> u8 {
         self.maybe_process_interrupts();
+
+        if self.halted {
+            self.mmu.maybe_tick_timers(1);
+            return 1;
+        }
 
         self.did_take_conditional_branch = false;
 
@@ -243,7 +250,9 @@ impl CPU {
                 let value = self.read_u8_target(src);
                 self.write_u8_target(dst, value);
             }
-            Instruction::Halt => return None,
+            // TODO: Handle HALT bug
+            // https://gbdev.io/pandocs/halt.html?highlight=halted#halt-bug
+            Instruction::Halt => self.halted = true,
             Instruction::JumpImmediate(condition) => self.jump_immediate(condition),
             Instruction::DisableInterrupts => self.interrupts_enabled = false,
             Instruction::EnableInterrupts => self.interrupts_enabled = true,
@@ -307,7 +316,7 @@ impl CPU {
 
         self.mmu.maybe_tick_timers(elapsed_cycles);
 
-        return Some(elapsed_cycles);
+        return elapsed_cycles;
     }
 
     pub fn mmu(&mut self) -> &mut MMU {
@@ -315,10 +324,6 @@ impl CPU {
     }
 
     fn maybe_process_interrupts(&mut self) {
-        if !self.interrupts_enabled {
-            return;
-        }
-
         let interrupt_per_priority: &[InterruptSource] = &[
             InterruptSource::VBlank,
             InterruptSource::Lcd,
@@ -328,18 +333,22 @@ impl CPU {
         ];
 
         for interrupt in interrupt_per_priority {
-            if self.maybe_handle_interrupt(*interrupt) {
-                return;
+            if !self.should_fire_interrupt(*interrupt) {
+                continue;
+            }
+            // The CPU should stop halting as soon as an interrupt is pending,
+            // regardless if we handle interrupts or not (IME doesn't matter)
+            // https://gbdev.io/pandocs/halt.html?highlight=halted#halt
+            self.halted = false;
+
+            if self.interrupts_enabled {
+                self.handle_interrupt(*interrupt)
             }
         }
     }
 
     // https://gbdev.io/pandocs/Interrupts.html#interrupt-handling
-    fn maybe_handle_interrupt(&mut self, interrupt: InterruptSource) -> bool {
-        if !self.should_fire_interrupt(interrupt) {
-            return false;
-        }
-
+    fn handle_interrupt(&mut self, interrupt: InterruptSource) {
         // The IF bit corresponding to this interrupt and the IME flag are reset by the CPU.
         self.interrupts_enabled = false;
         self.mmu.set_interrupt_flag(interrupt, false);
@@ -356,8 +365,6 @@ impl CPU {
         self.pc = interrupt_vector(interrupt) as u16;
 
         // TODO: This should last 5 M-cycles, do we need to indicate that?
-
-        return true;
     }
 
     fn should_fire_interrupt(&self, interrupt: InterruptSource) -> bool {
