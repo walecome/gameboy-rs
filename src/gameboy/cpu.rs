@@ -504,7 +504,7 @@ impl CPU {
             LoadSrcU16::StackPointerWithOffset => {
                 let offset = self.read_u8() as i8 as i16;
                 let signed_sp = self.sp as i16;
-                (signed_sp + offset) as u16
+                signed_sp.wrapping_add(offset) as u16
             }
         }
     }
@@ -611,7 +611,7 @@ impl CPU {
                 self.resolve_u16_reg(&reg).set(value);
             }
             U16Target::StackPointer => {
-                self.sp += 1;
+                self.sp = self.sp.wrapping_add(1);
             }
         };
     }
@@ -647,7 +647,7 @@ impl CPU {
                 self.resolve_u16_reg(&reg).set(value);
             }
             U16Target::StackPointer => {
-                self.sp -= 1;
+                self.sp = self.sp.wrapping_sub(1);
             }
         };
     }
@@ -779,7 +779,7 @@ impl CPU {
     fn add_stackpointer_immediate(&mut self) {
         let offset = self.read_u8() as i8 as i16;
         let signed_sp = self.sp as i16;
-        let result = signed_sp + offset;
+        let result = signed_sp.wrapping_add(offset);
 
         self.sp = result as u16;
 
