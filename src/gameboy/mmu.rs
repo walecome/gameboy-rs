@@ -1,3 +1,5 @@
+use std::io::{self, Write};
+
 use super::address::Address;
 use super::cartridge::Cartridge;
 use super::video::Video;
@@ -49,7 +51,7 @@ impl Word {
 
 pub struct IO {
     joypad_input: u8,
-    serial_transfer: (u8, u8),
+    serial: Serial,
     timer: Timer,
     audio: Vec<u8>,
     wave_pattern: Vec<u8>,
@@ -65,10 +67,10 @@ fn byte_vec_for_range(
 }
 
 impl IO {
-    fn new() -> Self {
+    fn new(print_serial: bool) -> Self {
         Self {
             joypad_input: 0x00,
-            serial_transfer: (0x00, 0x00),
+            serial: Serial::new(print_serial),
             timer: Timer::new(),
             audio: byte_vec_for_range(0xFF10, 0xFF26),
             wave_pattern: byte_vec_for_range(0xFF30, 0xFF3F),
@@ -200,13 +202,48 @@ impl Timer {
     }
 }
 
+struct Serial {
+    transfer_data: u8,
+    print_serial: bool,
+}
+
+impl Serial {
+    fn new(print_serial: bool) -> Self {
+        Self {
+            transfer_data: 0,
+            print_serial,
+        }
+    }
+    fn read(&self, address: Address) -> u8 {
+        match address.value() {
+            0xFF01 => self.transfer_data,
+            0xFF02 => todo!("Read for serial control"),
+            _ => panic!("Invalid serial address: {:#06X}", address.value()),
+        }
+    }
+
+    fn write(&mut self, address: Address, value: u8) {
+        match address.value() {
+            0xFF01 => self.transfer_data = value,
+            // TODO: Fire interrupt?
+            0xFF02 => {
+                if self.print_serial && get_bit(value, 7) {
+                    print!("{}", self.transfer_data as char);
+                    io::stdout().flush().unwrap();
+                }
+            },
+            _ => panic!("Invalid serial address: {:#06X}", address.value()),
+        }
+    }
+}
+
 impl MMU {
-    pub fn new(cartridge: Box<dyn Cartridge>) -> MMU {
+    pub fn new(cartridge: Box<dyn Cartridge>, print_serial: bool) -> MMU {
         MMU {
             cartridge,
             video: Video::new(),
             internal_ram: vec![0x00; 0x3000],
-            io: IO::new(),
+            io: IO::new(print_serial),
             high_ram: vec![0x00; 0x80],
             interrupt_enable: 0x00,
             interrupt_flags: 0x00,
@@ -305,8 +342,7 @@ impl MMU {
 
         match select_byte {
             0x00 => self.io.joypad_input,
-            0x01 => self.io.serial_transfer.0,
-            0x02 => self.io.serial_transfer.1,
+            0x01..=0x02 => self.io.serial.read(address),
             0x04..=0x07 => self.io.timer.read(address),
             0x10..=0x26 => self.io.audio[(select_byte - 0x10) as usize],
             0x30..=0x3F => self.io.wave_pattern[(select_byte - 0x30) as usize],
@@ -330,8 +366,7 @@ impl MMU {
 
         match select_byte {
             0x00 => self.io.joypad_input = value,
-            0x01 => self.io.serial_transfer.0 = value,
-            0x02 => self.io.serial_transfer.1 = value,
+            0x01..=0x02 => self.io.serial.write(address, value),
             0x04..=0x07 => self.io.timer.write(address, value),
             0x10..=0x26 => self.io.audio[(select_byte - 0x10) as usize] = value,
             0x30..=0x3F => self.io.wave_pattern[(select_byte - 0x30) as usize] = value,

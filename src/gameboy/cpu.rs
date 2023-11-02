@@ -18,11 +18,12 @@ use super::reference::ReferenceMetadata;
 
 use super::cycles;
 
-#[derive(Copy, Clone, ValueEnum)]
+#[derive(Copy, Clone, ValueEnum, PartialEq)]
 pub enum TraceMode {
     Off,
     WithBoot,
     WithoutBoot,
+    Serial,
 }
 
 struct RegisterPair<'a> {
@@ -216,7 +217,7 @@ impl CPU {
         CPU {
             pc: 0x0000,
             sp: 0x0FFFE,
-            mmu: MMU::new(cartridge),
+            mmu: MMU::new(cartridge, trace_mode == TraceMode::Serial),
             a: 0x00,
             b: 0x00,
             c: 0x00,
@@ -250,6 +251,7 @@ impl CPU {
             TraceMode::Off => false,
             TraceMode::WithBoot => true,
             TraceMode::WithoutBoot => self.mmu.boot_rom_disabled(),
+            TraceMode::Serial => false,
         };
 
         if should_trace {
