@@ -721,7 +721,7 @@ impl CPU {
         self.apply_flag_change(FlagChange {
             z: Some(self.a == 0),
             n: Some(false),
-            h: Some(true),
+            h: Some(false),
             c: Some(false),
         })
     }
