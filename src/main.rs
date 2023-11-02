@@ -2,14 +2,11 @@ mod gameboy;
 
 use std::{fs, path::PathBuf};
 
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 
-use gameboy::header::Header;
-use gameboy::video::FrameBuffer;
-
-use crate::gameboy::cartridge::create_for_cartridge_type;
-use crate::gameboy::cpu::{CPU, TraceMode};
-use crate::gameboy::reference::{get_reference_metadata, ReferenceMetadata};
+use crate::gameboy::gameboy::Gameboy;
+use crate::gameboy::cpu::TraceMode;
+use crate::gameboy::reference::get_reference_metadata;
 use crate::gameboy::video::{RgbColor, SCREEN_HEIGHT, SCREEN_WIDTH};
 
 extern crate sdl2;
@@ -29,61 +26,20 @@ struct Args {
     trace_mode: TraceMode,
 }
 
-struct Gameboy {
-    cpu: CPU,
-
-    // Internal / debug
-    index: usize,
-    maybe_reference_metadata: Option<Vec<ReferenceMetadata>>,
-}
-
-impl Gameboy {
-    fn new(args: Args) -> Self {
-        let rom_data = fs::read(args.rom).unwrap();
-        let header = Header::read_from_rom(&rom_data).unwrap();
-        println!("{:?}", header);
-
-        let cartridge = match create_for_cartridge_type(header.cartridge_type, rom_data) {
-            Some(cartridge) => cartridge,
-            None => todo!(
-                "Cartridge not implemented for type: {:?}",
-                header.cartridge_type
-            ),
-        };
-
-        Self {
-            cpu: CPU::new(cartridge, args.trace_mode),
-
-            index: 0,
-            maybe_reference_metadata: if let Some(reference) = args.reference {
-                Some(get_reference_metadata(&reference))
-            } else {
-                None
-            },
-        }
-    }
-
-    fn tick(&mut self) {
-        let current_metadata = if let Some(reference_metadata) = &self.maybe_reference_metadata {
-            if self.index >= reference_metadata.len() {
-                panic!("Ran out of reference data");
-            }
-            Some(&reference_metadata[self.index])
-        } else {
-            None
-        };
-        let cycles = self.cpu.tick(current_metadata, self.index);
-        self.cpu.mmu().video().tick(cycles as usize);
-        self.index += 1;
-    }
-
-    fn try_take_frame(&mut self) -> Option<&FrameBuffer> {
-        self.cpu.mmu().video().try_take_frame()
-    }
-}
-
 fn main() -> Result<(), String> {
-    let mut gameboy = Gameboy::new(Args::parse());
+    let args = Args::parse();
+    let rom_data = fs::read(args.rom).unwrap();
+    let reference_metdata = if let Some(reference) = args.reference {
+        Some(get_reference_metadata(&reference))
+    } else {
+        None
+    };
+
+    let mut gameboy = Gameboy::new(
+        rom_data,
+        reference_metdata,
+        args.trace_mode,
+    );
 
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
@@ -112,26 +68,15 @@ fn main() -> Result<(), String> {
         .create_texture_streaming(PixelFormatEnum::RGB24, width as u32, height as u32)
         .map_err(|e| e.to_string())?;
 
-    // Initial texture
-    if let Some(frame_buffer) = gameboy.try_take_frame() {
-        texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
-            for y in 0..height {
-                for x in 0..width {
-                    write_pixel(buffer, pitch, x, y, frame_buffer.get_pixel(x, y));
-                }
-            }
-        })?;
-    }
-
     canvas.clear();
     canvas.copy(&texture, None, None)?;
     canvas.present();
     let mut event_pump = sdl_context.event_pump()?;
 
     'running: loop {
-        gameboy.tick();
+        let maybe_frame = gameboy.tick();
 
-        if let Some(frame_buffer) = gameboy.try_take_frame() {
+        if let Some(frame_buffer) = maybe_frame {
             for event in event_pump.poll_iter() {
                 match event {
                     Event::Quit { .. }

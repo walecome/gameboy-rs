@@ -8,3 +8,4 @@ pub mod reference;
 pub mod video;
 pub mod cycles;
 pub mod utils;
+pub mod gameboy;
