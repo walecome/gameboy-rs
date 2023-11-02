@@ -45,7 +45,6 @@ pub enum LoadSrcU16 {
     Register(RegisterU16),
     ImmediateU16,
     StackPointer,
-    StackPointerWithOffset,
 }
 
 #[derive(Debug)]
@@ -93,6 +92,7 @@ pub enum Instruction {
     Halt,
     LoadU8 { dst: LoadDstU8, src: LoadSrcU8 },
     LoadU16 { dst: LoadDstU16, src: LoadSrcU16 },
+    LoadHlWithOffsetSp,
     JumpImmediate(Option<FlagCondition>),
     JumpAddressHL,
     DisableInterrupts,
@@ -265,10 +265,7 @@ fn try_decode_u16_load_instruction(opcode: u8) -> Option<Instruction> {
             dst: LoadDstU16::ImmediateAddress,
             src: LoadSrcU16::StackPointer,
         }),
-        0xF8 => Some(Instruction::LoadU16 {
-            dst: LoadDstU16::Register(RegisterU16::HL),
-            src: LoadSrcU16::StackPointerWithOffset,
-        }),
+        0xF8 => Some(Instruction::LoadHlWithOffsetSp),
         0xF9 => Some(Instruction::LoadU16 {
             dst: LoadDstU16::StackPointer,
             src: LoadSrcU16::Register(RegisterU16::HL),

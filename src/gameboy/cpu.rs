@@ -277,6 +277,22 @@ impl CPU {
                 let value = self.read_u16_target(src);
                 self.write_u16_target(dst, value);
             }
+            Instruction::LoadHlWithOffsetSp => {
+                // TODO: Move
+                let offset = self.read_u8() as i8 as i16;
+                let signed_sp = self.sp as i16;
+                let result = signed_sp.wrapping_add(offset);
+
+                self.write_u16_target(LoadDstU16::Register(RegisterU16::HL), result as u16);
+                let signed_mask = 0xFFFF as u16 as i16;
+
+                self.apply_flag_change(FlagChange {
+                    z: Some(false),
+                    n: Some(false),
+                    h: Some(((signed_sp ^ offset ^ (result & signed_mask)) & 0x10) == 0x10),
+                    c: Some(((signed_sp ^ offset ^ (result & signed_mask)) & 0x100) == 0x100),
+                });
+            }
             Instruction::Call(condition) => self.call(condition),
             Instruction::JumpRelative(condition) => self.relative_jump(condition),
             Instruction::Ret(condition) => self.ret(condition),
@@ -525,11 +541,6 @@ impl CPU {
             LoadSrcU16::Register(reg) => self.resolve_u16_reg(&reg).get(),
             LoadSrcU16::ImmediateU16 => self.read_u16(),
             LoadSrcU16::StackPointer => self.sp,
-            LoadSrcU16::StackPointerWithOffset => {
-                let offset = self.read_u8() as i8 as i16;
-                let signed_sp = self.sp as i16;
-                signed_sp.wrapping_add(offset) as u16
-            }
         }
     }
 
