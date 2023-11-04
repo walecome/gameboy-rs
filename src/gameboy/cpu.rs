@@ -163,7 +163,6 @@ pub struct CPU {
     halted: bool,
 
     // Debug
-    depth: usize,
     trace_mode: TraceMode,
 }
 
@@ -229,7 +228,6 @@ impl CPU {
             flag_register: FlagRegister::new(),
             did_take_conditional_branch: false,
             halted: false,
-            depth: 0,
             trace_mode,
         }
     }
@@ -255,7 +253,6 @@ impl CPU {
         };
 
         if should_trace {
-            print!("{:.<1$}", "", 1 * self.depth);
             println!("{:#06X}: {:#04X} ({:?})", pc, opcode, instruction);
         }
 
@@ -562,7 +559,6 @@ impl CPU {
     fn call(&mut self, condition: Option<FlagCondition>) {
         let target_address = self.read_u16();
         if self.is_flag_condition_true(condition) {
-            self.depth += 1;
             self.stack_push(self.pc);
             self.pc = target_address;
         }
@@ -600,8 +596,6 @@ impl CPU {
         if self.is_flag_condition_true(condition) {
             let new_pc = self.stack_pop();
             self.pc = new_pc;
-            assert!(self.depth != 0);
-            self.depth -= 1;
         }
     }
 
