@@ -293,6 +293,10 @@ impl CPU {
             Instruction::Call(condition) => self.call(condition),
             Instruction::JumpRelative(condition) => self.relative_jump(condition),
             Instruction::Ret(condition) => self.ret(condition),
+            Instruction::Reti => {
+                self.ret(None);
+                self.interrupts_enabled = true;
+            },
             Instruction::Push(reg) => self.push(reg),
             Instruction::Pop(reg) => self.pop(reg),
             Instruction::Or(target) => self.or(target),

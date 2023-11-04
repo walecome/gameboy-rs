@@ -100,6 +100,7 @@ pub enum Instruction {
     Call(Option<FlagCondition>),
     JumpRelative(Option<FlagCondition>),
     Ret(Option<FlagCondition>),
+    Reti,
     Push(RegisterU16),
     Pop(RegisterU16),
     IncU8(IncDecU8Target),
@@ -308,7 +309,7 @@ fn try_decode_ret_instruction(opcode: u8) -> Option<Instruction> {
         0xD0 => Instruction::Ret(Some(FlagCondition::NC)),
         0xD8 => Instruction::Ret(Some(FlagCondition::C)),
 
-        0xD9 => todo!("RETI"),
+        0xD9 => Instruction::Reti,
         _ => return None,
     })
 }
