@@ -339,6 +339,7 @@ impl CPU {
             Instruction::Scf => self.scf(),
             Instruction::Ccf => self.ccf(),
             Instruction::Daa => self.daa(),
+            Instruction::Rst(addr) => self.rst(addr),
         }
 
         let elapsed_cycles = match (self.did_take_conditional_branch, opcode_type) {
@@ -558,6 +559,11 @@ impl CPU {
                 self.mmu.write_word(Address::new(addr), Word::new(value));
             }
         }
+    }
+
+    fn rst(&mut self, addr: u16) {
+        self.stack_push(self.pc);
+        self.pc = addr;
     }
 
     fn call(&mut self, condition: Option<FlagCondition>) {

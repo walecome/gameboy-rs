@@ -136,6 +136,7 @@ pub enum Instruction {
     Scf,
     Ccf,
     Daa,
+    Rst(u16),
 }
 
 fn resolve_common_operand_from_col(col: u8) -> CommonOperand {
@@ -485,6 +486,22 @@ fn try_decode_jp_instruction(opcode: u8) -> Option<Instruction> {
     })
 }
 
+fn try_decode_rst_instruction(opcode: u8) -> Option<Instruction> {
+    Some(match opcode {
+        0xC7 => Instruction::Rst(0x00),
+        0xD7 => Instruction::Rst(0x10),
+        0xE7 => Instruction::Rst(0x20),
+        0xF7 => Instruction::Rst(0x30),
+
+        0xCF => Instruction::Rst(0x08),
+        0xDF => Instruction::Rst(0x18),
+        0xEF => Instruction::Rst(0x28),
+        0xFF => Instruction::Rst(0x38),
+
+        _ => return None,
+    })
+}
+
 // https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 pub fn decode(opcode: u8) -> Option<Instruction> {
     if let Some(instruction) = try_decode_u8_load_instruction(opcode) {
@@ -559,6 +576,9 @@ pub fn decode(opcode: u8) -> Option<Instruction> {
         return Some(instruction);
     }
 
+    if let Some(instruction) = try_decode_rst_instruction(opcode) {
+        return Some(instruction);
+    }
 
     match opcode {
         0x00 => Some(Instruction::Noop),
