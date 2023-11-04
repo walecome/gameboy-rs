@@ -958,10 +958,10 @@ impl CPU {
 
     fn bit(&mut self, n: u8, target: CommonOperand) {
         self.apply_cb_target(target, |value| {
-            let z = value & (1 << n) != 0;
+            let is_bit_set = get_bit(value, n);
 
             return (None, FlagChange {
-                z: Some(z),
+                z: Some(!is_bit_set),
                 n: Some(false),
                 h: Some(true),
                 c: None,
