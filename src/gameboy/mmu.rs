@@ -161,8 +161,18 @@ impl Timer {
         }
     }
 
-    fn maybe_tick(&mut self, elapsed_cycles: u8) -> bool {
-        self.clock_counter += (elapsed_cycles as usize) * 4;
+    fn maybe_tick_cycles(&mut self, elapsed_cycles: u8) -> bool {
+        let mut fire_interrupt = false;
+        for _ in 0..elapsed_cycles {
+            if self.maybe_tick_clock() {
+                fire_interrupt = true;
+            }
+        }
+        return fire_interrupt;
+    }
+
+    fn maybe_tick_clock(&mut self) -> bool {
+        self.clock_counter += 1;
 
         let clock_select_div = self.get_clock_select() as usize;
         let should_increment_timer = self.is_timer_enabled() && self.clock_counter >= clock_select_div;
@@ -325,7 +335,7 @@ impl MMU {
     }
 
     pub fn maybe_tick_timers(&mut self, elapsed_cycles: u8) {
-        if self.io.timer.maybe_tick(elapsed_cycles) {
+        if self.io.timer.maybe_tick_cycles(elapsed_cycles) {
             self.set_interrupt_flag(InterruptSource::Timer, true);
         }
     }
