@@ -163,7 +163,7 @@ impl Timer {
 
     fn maybe_tick_cycles(&mut self, elapsed_cycles: u8) -> bool {
         let mut fire_interrupt = false;
-        for _ in 0..elapsed_cycles {
+        for _ in 0..(elapsed_cycles * 4) {
             if self.maybe_tick_clock() {
                 fire_interrupt = true;
             }
