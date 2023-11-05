@@ -123,7 +123,7 @@ enum ClockSelect {
     Div1024 = 1024,
     Div16 = 16,
     Div64 = 64,
-    Div256 = 245,
+    Div256 = 256,
 }
 
 impl Timer {
