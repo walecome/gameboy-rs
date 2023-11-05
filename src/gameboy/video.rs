@@ -1,3 +1,5 @@
+use crate::common::framebuffer::{FrameBuffer, RgbColor};
+
 use super::address::Address;
 use super::utils::{get_bit, set_bit_mut};
 
@@ -158,56 +160,12 @@ impl Palette {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct RgbColor {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-}
-
-impl RgbColor {
-    fn new(r: u8, g: u8, b: u8) -> Self {
-        Self { r, g, b }
-    }
-
-    fn new_gray(shade: u8) -> Self {
-        RgbColor::new(shade, shade, shade)
-    }
-}
-
-pub struct FrameBuffer {
-    data: Vec<RgbColor>,
-    pub width: usize,
-    pub height: usize,
-}
-
 fn to_screen_color(palette_color: PaletteColor) -> RgbColor {
     match palette_color {
         PaletteColor::WhiteOrTransparent => RgbColor::new_gray(255),
         PaletteColor::LightGray => RgbColor::new_gray(160),
         PaletteColor::DarkGray => RgbColor::new_gray(90),
         PaletteColor::Black => RgbColor::new_gray(0),
-    }
-}
-
-impl FrameBuffer {
-    fn new(width: usize, height: usize) -> Self {
-        let pixel_count = width * height;
-        Self {
-            data: vec![to_screen_color(PaletteColor::WhiteOrTransparent); pixel_count],
-            width,
-            height,
-        }
-    }
-
-    pub fn get_pixel(&self, x: usize, y: usize) -> RgbColor {
-        let index = y as usize * self.width + x as usize;
-        self.data[index]
-    }
-
-    fn set_pixel(&mut self, x: u8, y: u8, color: PaletteColor) {
-        let index = y as usize * self.width + x as usize;
-        self.data[index] = to_screen_color(color);
     }
 }
 
@@ -443,7 +401,7 @@ impl Video {
                 Address::new(tile_start_addr.value() + (y_in_tile as u16) * tile_row_byte_count);
 
             let color = self.read_tile_pixel_color(tile_row_addr, x_in_tile, &self.bg_palette);
-            self.frame_buffer.set_pixel(x, y, color);
+            self.frame_buffer.set_pixel(x, y, to_screen_color(color));
         }
     }
 

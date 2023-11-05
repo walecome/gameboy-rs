@@ -7,4 +7,8 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.4.3", features = ["derive"] }
-sdl2 = "0.35.2"
+# Using "unsafe_textures" to allow Platform struct.
+# https://www.reddit.com/r/rust_gamedev/comments/du0fqf/i_cant_get_preloading_sdl2_textures_and_lifetimes/
+# https://stackoverflow.com/questions/74776801/rustsdl2-how-to-store-a-texture-in-a-struct
+# https://github.com/Rust-SDL2/rust-sdl2/#about-the-unsafe_textures-feature
+sdl2 = { version = "0.35.2", features = ["unsafe_textures"] }

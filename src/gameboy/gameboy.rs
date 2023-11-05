@@ -1,9 +1,10 @@
+use crate::common::framebuffer::FrameBuffer;
+
 use super::cartridge::create_for_cartridge_type;
 use super::cpu::CPU;
 use super::cpu::TraceMode;
 use super::header::{Header, FlagCGB};
 use super::reference::ReferenceMetadata;
-use super::video::FrameBuffer;
 
 pub struct Gameboy {
     cpu: CPU,
