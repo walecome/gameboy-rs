@@ -164,26 +164,24 @@ impl Timer {
     fn maybe_tick_cycles(&mut self, elapsed_cycles: u8) -> bool {
         let mut fire_interrupt = false;
         for _ in 0..(elapsed_cycles * 4) {
-            if self.maybe_tick_clock() {
-                fire_interrupt = true;
+            if self.is_timer_enabled() {
+                fire_interrupt |= self.tick_clock();
             }
         }
         return fire_interrupt;
     }
 
-    fn maybe_tick_clock(&mut self) -> bool {
+    fn tick_clock(&mut self) -> bool {
         self.clock_counter += 1;
 
         let clock_select_div = self.get_clock_select() as usize;
-        let should_increment_timer = self.is_timer_enabled() && self.clock_counter >= clock_select_div;
-        self.clock_counter %= clock_select_div;
 
-        if should_increment_timer {
-            let fire_interrupt = self.increment_timer_counter();
-            return fire_interrupt;
+        if self.clock_counter < clock_select_div {
+            return false;
         }
 
-        return false;
+        self.clock_counter -= clock_select_div;
+        return self.increment_timer_counter();
     }
 
     fn get_clock_select(&self) -> ClockSelect {
