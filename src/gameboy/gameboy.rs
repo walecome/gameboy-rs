@@ -55,6 +55,7 @@ impl Gameboy {
 
         let cycles = self.cpu.tick(current_metadata, self.index);
         self.cpu.mmu().video().tick(cycles as usize);
+        self.cpu.mmu().maybe_tick_timers(cycles);
 
         self.index += 1;
 

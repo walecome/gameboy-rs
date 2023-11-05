@@ -236,7 +236,6 @@ impl CPU {
         self.maybe_process_interrupts();
 
         if self.halted {
-            self.mmu.maybe_tick_timers(1);
             return 1;
         }
 
@@ -348,8 +347,6 @@ impl CPU {
             (true, OpcodeType::Normal) => cycles::NORMAL_OPCODE_CYCLES_BRANCED[opcode as usize],
             (true, OpcodeType::Cb) => unreachable!("CB opcodes shouldn't branch"),
         };
-
-        self.mmu.maybe_tick_timers(elapsed_cycles);
 
         return elapsed_cycles;
     }
