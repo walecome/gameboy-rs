@@ -21,6 +21,8 @@ struct Args {
     #[arg(long)]
     #[arg(value_enum, default_value_t=TraceMode::Off)]
     trace_mode: TraceMode,
+    #[arg(long)]
+    headless: bool,
 }
 
 fn main() -> Result<(), String> {
@@ -38,15 +40,23 @@ fn main() -> Result<(), String> {
         args.trace_mode,
     );
 
-    let mut platform = Platform::new(
-        Size::new(600, 540),
-        Size::new(SCREEN_WIDTH as usize, SCREEN_HEIGHT as usize),
-    )?;
+    let mut maybe_platform: Option<Platform> = if args.headless {
+        None
+    } else {
+        let platform_or_err = Platform::new(
+            Size::new(600, 540),
+            Size::new(SCREEN_WIDTH as usize, SCREEN_HEIGHT as usize),
+        );
+        if platform_or_err.is_err() {
+            return Err(platform_or_err.err().unwrap());
+        }
+        Some(platform_or_err.unwrap())
+    };
 
     'running: loop {
         let maybe_frame = gameboy.tick();
 
-        if let Some(frame) = maybe_frame {
+        if let (Some(frame), Some(platform)) = (maybe_frame, maybe_platform.as_mut()) {
             let maybe_event = platform.give_new_frame(frame);
             if let Some(event) = maybe_event {
                 match event {
