@@ -39,7 +39,7 @@ impl Cartridge for MBC1 {
         match address.value() {
             0x2000..=0x3FFF => {
                 if value > 0b0001_1111 {
-                    todo!("Invalid BANK1 register value '{:04X}'. Should we allow this?", value);
+                    panic!("Invalid BANK1 register value '{:04X}'. Should we allow this?", value);
                 }
                 let fixed_value = if value & 0x1 == 0 {
                     value + 1
