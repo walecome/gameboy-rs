@@ -359,7 +359,7 @@ impl MMU {
             0x47..=0x4B => self.video.read_register(select_byte),
             0x4D => {
                 // TODO: This is for CGB, but still used by some roms. Log?
-                0xFF
+                0x00
             },
             0x50 => self.io.boot_rom_disabled,
             _ => panic!("Read for unmapped IO address: {:#06X}", address.value()),
