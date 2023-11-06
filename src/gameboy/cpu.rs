@@ -339,6 +339,11 @@ impl CPU {
             Instruction::Ccf => self.ccf(),
             Instruction::Daa => self.daa(),
             Instruction::Rst(addr) => self.rst(addr),
+            Instruction::Stop => {
+                // TODO: Should we actually do anything?
+                // Note that stop is encoded as 0x10 0x00, i.e. 2 bytes,
+                // but since 0x00 is NOP it's fine,
+            }
         }
 
         let elapsed_cycles = match (self.did_take_conditional_branch, opcode_type) {
