@@ -38,7 +38,9 @@ impl Gameboy {
 
         Self {
             cpu: if skip_boot_rom {
-                CPU::new_without_boot_rom(cartridge, trace_mode)
+                let mut tmp = CPU::new_without_boot_rom(cartridge, trace_mode);
+                tmp.mmu().disable_boot_rom();
+                tmp
             } else {
                 CPU::new(cartridge, trace_mode)
             },

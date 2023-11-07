@@ -338,6 +338,10 @@ impl MMU {
         }
     }
 
+    pub fn disable_boot_rom(&mut self) {
+        self.io.boot_rom_disabled = 1
+    }
+
     pub fn boot_rom_disabled(&self) -> bool {
         self.io.boot_rom_disabled != 0
     }
