@@ -19,6 +19,7 @@ impl Gameboy {
         rom_data: Vec<u8>,
         reference_metadata: Option<Vec<ReferenceMetadata>>,
         trace_mode: TraceMode,
+        skip_boot_rom: bool,
     ) -> Self {
         let header = Header::read_from_rom(&rom_data).unwrap();
         println!("{:#?}", header);
@@ -36,7 +37,11 @@ impl Gameboy {
         };
 
         Self {
-            cpu: CPU::new(cartridge, trace_mode),
+            cpu: if skip_boot_rom {
+                CPU::new_without_boot_rom(cartridge, trace_mode)
+            } else {
+                CPU::new(cartridge, trace_mode)
+            },
 
             index: 0,
             maybe_reference_metadata: reference_metadata,

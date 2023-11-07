@@ -23,6 +23,8 @@ struct Args {
     trace_mode: TraceMode,
     #[arg(long)]
     headless: bool,
+    #[arg(long)]
+    skip_boot_rom: bool,
 }
 
 fn main() -> Result<(), String> {
@@ -38,6 +40,7 @@ fn main() -> Result<(), String> {
         rom_data,
         reference_metdata,
         args.trace_mode,
+        args.skip_boot_rom,
     );
 
     let mut maybe_platform: Option<Platform> = if args.headless {

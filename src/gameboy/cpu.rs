@@ -96,6 +96,10 @@ impl FlagRegister {
         Self { value: 0x00, }
     }
 
+    fn new_without_boot_rom() -> Self {
+        Self { value: 0xB0, }
+    }
+
     fn get_z(&self) -> bool {
         get_bit(self.value, 7)
     }
@@ -226,6 +230,26 @@ impl CPU {
             l: 0x00,
             interrupts_enabled: false,
             flag_register: FlagRegister::new(),
+            did_take_conditional_branch: false,
+            halted: false,
+            trace_mode,
+        }
+    }
+
+    pub fn new_without_boot_rom(cartridge: Box<dyn Cartridge>, trace_mode: TraceMode) -> CPU {
+        CPU {
+            pc: 0x0100,
+            sp: 0x0FFFE,
+            mmu: MMU::new(cartridge, trace_mode == TraceMode::Serial),
+            a: 0x01,
+            b: 0x00,
+            c: 0x13,
+            d: 0x00,
+            e: 0xD8,
+            h: 0x01,
+            l: 0x4D,
+            interrupts_enabled: false,
+            flag_register: FlagRegister::new_without_boot_rom(),
             did_take_conditional_branch: false,
             halted: false,
             trace_mode,
