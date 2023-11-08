@@ -165,6 +165,7 @@ pub struct CPU {
     flag_register: FlagRegister,
     did_take_conditional_branch: bool,
     halted: bool,
+    timer_ticks: u8,
 
     // Debug
     trace_mode: TraceMode,
@@ -233,6 +234,7 @@ impl CPU {
             did_take_conditional_branch: false,
             halted: false,
             trace_mode,
+            timer_ticks: 0,
         }
     }
 
@@ -253,14 +255,16 @@ impl CPU {
             did_take_conditional_branch: false,
             halted: false,
             trace_mode,
+            timer_ticks: 0,
         }
     }
 
-    pub fn tick(&mut self, maybe_metadata: Option<&ReferenceMetadata>, i: usize) -> u8 {
+    pub fn tick(&mut self, maybe_metadata: Option<&ReferenceMetadata>, i: usize) -> (u8, u8) {
+        self.timer_ticks = 0;
         self.maybe_process_interrupts();
 
         if self.halted {
-            return 1;
+            return (1, 1);
         }
 
         self.did_take_conditional_branch = false;
@@ -377,7 +381,7 @@ impl CPU {
             (true, OpcodeType::Cb) => unreachable!("CB opcodes shouldn't branch"),
         };
 
-        return elapsed_cycles;
+        return (elapsed_cycles, elapsed_cycles - self.timer_ticks);
     }
 
     pub fn mmu(&mut self) -> &mut MMU {
@@ -454,7 +458,12 @@ impl CPU {
 
     fn read_u8(&mut self) -> u8 {
         let address = Address::new(self.next_pc());
-        self.mmu.read(address)
+        let value = self.mmu.read(address);
+
+        self.mmu.maybe_tick_timers(1);
+        self.timer_ticks += 1;
+
+        value
     }
 
     fn read_u16(&mut self) -> u16 {
