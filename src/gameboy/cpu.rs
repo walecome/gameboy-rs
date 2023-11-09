@@ -257,9 +257,11 @@ impl CPU {
     }
 
     pub fn tick(&mut self, maybe_metadata: Option<&ReferenceMetadata>, i: usize) -> u8 {
-        self.maybe_process_interrupts();
+        let interrupt_cycles = self.maybe_process_interrupts();
 
         if self.halted {
+            // Handling an interrupt
+            assert_eq!(interrupt_cycles, 0);
             return 1;
         }
 
@@ -377,14 +379,14 @@ impl CPU {
             (true, OpcodeType::Cb) => unreachable!("CB opcodes shouldn't branch"),
         };
 
-        return elapsed_cycles;
+        return elapsed_cycles + interrupt_cycles;
     }
 
     pub fn mmu(&mut self) -> &mut MMU {
         &mut self.mmu
     }
 
-    fn maybe_process_interrupts(&mut self) {
+    fn maybe_process_interrupts(&mut self) -> u8 {
         let interrupt_per_priority: &[InterruptSource] = &[
             InterruptSource::VBlank,
             InterruptSource::Lcd,
@@ -403,13 +405,17 @@ impl CPU {
             self.halted = false;
 
             if self.interrupts_enabled {
-                self.handle_interrupt(*interrupt)
+                let cycles = self.handle_interrupt(*interrupt);
+                assert_eq!(self.interrupts_enabled, false);
+                return cycles;
             }
         }
+
+        return 0;
     }
 
     // https://gbdev.io/pandocs/Interrupts.html#interrupt-handling
-    fn handle_interrupt(&mut self, interrupt: InterruptSource) {
+    fn handle_interrupt(&mut self, interrupt: InterruptSource) -> u8 {
         // The IF bit corresponding to this interrupt and the IME flag are reset by the CPU.
         self.interrupts_enabled = false;
         self.mmu.set_interrupt_flag(interrupt, false);
@@ -425,7 +431,8 @@ impl CPU {
         // The PC register is set to the address of the handler
         self.pc = interrupt_vector(interrupt) as u16;
 
-        // TODO: This should last 5 M-cycles, do we need to indicate that?
+        // Interrupt handling should last 5 M-cycles.
+        return 5;
     }
 
     fn should_fire_interrupt(&self, interrupt: InterruptSource) -> bool {
