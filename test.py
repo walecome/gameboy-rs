@@ -6,11 +6,11 @@ import time
 import fcntl
 import os
 
-from argparse import ArgumentParser
 from pathlib import Path
 from typing import IO, List, Optional
 from enum import Enum, auto
 from dataclasses import dataclass
+
 SCRIPT_DIR = Path(__file__).parent
 
 def build_emulator():
@@ -28,6 +28,7 @@ class TestStatus(Enum):
     Pass = auto()
     Fail = auto()
     Timeout = auto()
+    Crashed = auto()
 
 @dataclass
 class TestResult:
@@ -41,6 +42,8 @@ def non_block_read(output):
         fl = fcntl.fcntl(fd, fcntl.F_GETFL)
         fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
         return output.read()
+    except KeyboardInterrupt:
+        raise
     except:
         return None
 
@@ -68,7 +71,7 @@ def run_test(
         rom: Path,
         timeout: int,
 ) -> TestResult:
-    print(f"Running test for ROM: {rom}")
+    print(f"TEST: {rom.relative_to(SCRIPT_DIR)}")
     start_time = time.time()
 
     with subprocess.Popen(
@@ -96,6 +99,14 @@ def run_test(
                         status=maybe_status,
                         output="\n".join(streamed_output.read()),
                     )
+
+                if p.poll() is not None:
+                    return TestResult(
+                        rom=rom,
+                        status=TestStatus.Crashed,
+                        output="\n".join(streamed_output.read()),
+                    )
+                time.sleep(0.01)
         except:
             raise
         finally:
@@ -107,47 +118,54 @@ def run_test(
         output="\n".join(streamed_output.read()),
     )
 
-def parse_args():
-    parser = ArgumentParser()
+def get_test_roms(base_rom_dir: Path) -> List[Path]:
+    return [
+        base_rom_dir / 'cpu_instrs' / 'cpu_instrs.gb',
+        *(base_rom_dir / 'cpu_instrs' / 'individual').glob("*.gb"),
+        base_rom_dir / 'instr_timing' / 'instr_timing.gb',
+        base_rom_dir / 'mem_timing' / 'mem_timing.gb',
+        *(base_rom_dir / 'mem_timing' / 'individual').glob("*.gb"),
+    ]
 
-    parser.add_argument('test_rom_dir', type=Path)
+def emit_result(result: TestResult) -> bool:
+    if result.status == TestStatus.Pass:
+        print("OK")
+        return True
 
-    return parser.parse_args()
+    if result.status == TestStatus.Fail:
+        print(f"Test failed")
+    if result.status == TestStatus.Timeout:
+        print(f"Test timed out")
+    if result.status == TestStatus.Crashed:
+        print(f"Test crashed")
 
-def get_test_roms(rom_dir: Path) -> List[Path]:
-    return list(rom_dir.glob("*.gb"))
+    print("Test output: ")
+    print("==========================================")
+    print(result.output)
+    print("==========================================")
+    print()
 
-def emit_results(results: List[TestResult]):
-    any_failed = False
-    for result in results:
-        if result.status == TestStatus.Pass:
-            continue
-        any_failed = True
-        if result.status == TestStatus.Fail:
-            print(f"Test failed: {result.rom}")
-        if result.status == TestStatus.Timeout:
-            print(f"Test timed out: {result.rom}")
-
-        print("Test output: ")
-        print("==========================================")
-        print(result.output)
-        print("==========================================")
-        print()
-
-    if any_failed:
-        print("There were failing tests")
-    else:
-        print("All tests passed")
+    return False
 
 def main():
-    args = parse_args()
-    test_roms = get_test_roms(args.test_rom_dir)
+    test_rom_base_dir = SCRIPT_DIR / 'lib' / 'gb-test-roms'
+    test_roms = get_test_roms(test_rom_base_dir)
     if not test_roms:
-        print(f"No test roms found in dir: {args.test_rom_dir}")
+        print(f"No test roms found in dir: {test_rom_base_dir}")
         sys.exit(1)
     build_emulator()
-    results = [run_test(test_rom, 10) for test_rom in test_roms]
-    emit_results(results)
+
+    all_passed = True
+    for test_rom in test_roms:
+        result = run_test(test_rom, timeout=50)
+        all_passed &= emit_result(result)
+
+    if all_passed:
+        print("All tests passed")
+    else:
+        print("There were failing test")
+
+    sys.exit(0 if all_passed else 1)
 
 if __name__ == '__main__':
     main()
