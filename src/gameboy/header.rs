@@ -20,8 +20,10 @@ pub enum FlagSGB {
 }
 
 fn read_title_info(data: &Vec<u8>) -> Result<TitleInfo, String> {
+    // TODO: Take different size into better consideration:
+    // https://gbdev.io/pandocs/The_Cartridge_Header.html#0134-0143--title
     // Title was originally 15 bytes, but support only 11 bytes (due to newer gameboys)
-    let mut title_bytes: &[u8] = &data[0x0134..=0x013F];
+    let mut title_bytes: &[u8] = &data[0x0134..=0x0143];
     let first_zero = title_bytes.iter().position(|&x| x == 0x00);
     title_bytes = match first_zero {
         Some(index) => &title_bytes[0..index],
@@ -48,11 +50,19 @@ fn read_title_info(data: &Vec<u8>) -> Result<TitleInfo, String> {
 
     let flag_byte: &u8 = &data[0x0143];
 
-    let flag = match flag_byte {
-        0x80 => Ok(FlagCGB::WorksWithOld),
-        0xC0 => Ok(FlagCGB::RequiresNew),
-        _ => Err(format!("Invalid flag: {}", flag_byte)),
-    }?;
+    match flag_byte {
+        0xC0 => {
+            panic!("The cartridge requires CGB functionality");
+        },
+        _ => (),
+    }
+
+    let flag: FlagCGB = match flag_byte {
+        // 0x80 => Ok(FlagCGB::WorksWithOld),
+        0xC0 => FlagCGB::RequiresNew,
+        // _ => Err(format!("Invalid flag: {}", flag_byte)),
+        _ => FlagCGB::WorksWithOld,
+    };
 
     Ok(TitleInfo {
         title,
