@@ -6,6 +6,26 @@ pub trait Cartridge {
     fn write(&mut self, address: Address, value: u8);
 }
 
+struct RomOnly {
+    rom_data: Vec<u8>,
+}
+
+impl RomOnly {
+    fn new(rom_data: Vec<u8>) -> Self {
+        Self { rom_data }
+    }
+}
+
+impl Cartridge for RomOnly {
+    fn read(&self, address: Address) -> u8 {
+        return self.rom_data[address.index_value()];
+    }
+
+    fn write(&mut self, _address: Address, _value: u8) {
+        panic!("Attempt to write to RomOnly data");
+    }
+}
+
 struct MBC1 {
     rom_data: Vec<u8>,
     rom_bank: u8,
@@ -56,6 +76,7 @@ impl Cartridge for MBC1 {
 
 pub fn create_for_cartridge_type(cartridge_type: CartridgeType, rom_data: Vec<u8>) -> Option<Box<dyn Cartridge>> {
     match cartridge_type {
+        CartridgeType::RomOnly => Some(Box::new(RomOnly::new(rom_data))),
         CartridgeType::MBC1 => Some(Box::new(MBC1::new(rom_data))),
         _ => None,
     }
