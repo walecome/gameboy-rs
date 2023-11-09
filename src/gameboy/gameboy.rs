@@ -62,13 +62,8 @@ impl Gameboy {
 
         let cycles = self.cpu.tick(current_metadata, self.index);
         self.cpu.mmu().video().tick(cycles as usize);
-        // FIXME: This is to naive of an approach for ticking the timer.
-        //        We need to be ticking the timer while the cpu reads
-        //        things (instructions, data) from memory. F.ex, the
-        //        timer can change between us fetching the opcode, and
-        //        us fetching the data for the operands. Changing this
-        //        requires quite a big rewrite though...
-        self.cpu.mmu().maybe_tick_timers(cycles);
+        let consumed_memory_cycles = self.cpu.mmu().take_consumed_cycles();
+        self.cpu.mmu().maybe_tick_timers(cycles - consumed_memory_cycles);
 
         self.index += 1;
 

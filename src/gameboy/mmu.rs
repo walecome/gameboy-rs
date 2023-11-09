@@ -87,6 +87,7 @@ pub struct MMU {
     high_ram: Vec<u8>,
     interrupt_enable: u8,
     interrupt_flags: u8,
+    consumed_read_write_cycles: u8,
 }
 
 #[derive(Copy, Clone)]
@@ -255,14 +256,22 @@ impl MMU {
             high_ram: vec![0x00; 0x80],
             interrupt_enable: 0x00,
             interrupt_flags: 0x00,
+            consumed_read_write_cycles: 0x00,
         }
+    }
+
+    pub fn take_consumed_cycles(&mut self) -> u8 {
+        let ret = self.consumed_read_write_cycles;
+        self.consumed_read_write_cycles = 0;
+        return ret;
     }
 
     pub fn video(&mut self) -> &mut Video {
         &mut self.video
     }
 
-    pub fn read(&self, address: Address) -> u8 {
+    pub fn read(&mut self, address: Address) -> u8 {
+        self.consume_cycle();
         if address.value() == 0xFF0F {
             return self.interrupt_flags;
         }
@@ -287,7 +296,7 @@ impl MMU {
         }
     }
 
-    pub fn read_word(&self, address: Address) -> Word {
+    pub fn read_word(&mut self, address: Address) -> Word {
         let low = self.read(address);
         let high = self.read(address.next());
 
@@ -295,6 +304,7 @@ impl MMU {
     }
 
     pub fn write(&mut self, address: Address, value: u8) {
+        self.consume_cycle();
         if address.value() == 0xFF0F {
             self.interrupt_flags = value;
             return;
@@ -406,6 +416,10 @@ impl MMU {
             src_addr = src_addr.next();
             dst_addr = dst_addr.next();
         }
+    }
 
+    fn consume_cycle(&mut self) {
+        self.consumed_read_write_cycles += 1;
+        self.maybe_tick_timers(1);
     }
 }
