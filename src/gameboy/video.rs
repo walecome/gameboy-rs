@@ -171,6 +171,7 @@ fn to_screen_color(palette_color: PaletteColor) -> RgbColor {
 
 pub struct Video {
     vram: Vec<u8>,
+    oam: Vec<u8>,
     lyc: u8,
 
     lcd_status: LcdStatus,
@@ -194,6 +195,7 @@ impl Video {
     pub fn new() -> Self {
         Self {
             vram: vec![0x00; 0x4000],
+            oam: vec![0x00; 0xA0],
             lcd_status: LcdStatus::new(),
             lcd_control: LcdControl::new(),
             lyc: 0,
@@ -324,13 +326,13 @@ impl Video {
     }
 
     pub fn write_oam(&mut self, address: Address, value: u8) {
-        let _index = address.index_value() - 0xFE00;
-        todo!("Write to OAM");
+        let index = address.index_value() - 0xFE00;
+        self.oam[index] = value;
     }
 
     pub fn read_oam(&self, address: Address) -> u8 {
-        let _index = address.index_value() - 0xFE00;
-        todo!("Read from OAM");
+        let index = address.index_value() - 0xFE00;
+        self.oam[index]
     }
 
     pub fn read_register(&self, select_byte: u8) -> u8 {
