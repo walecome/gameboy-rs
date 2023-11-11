@@ -234,27 +234,29 @@ impl Video {
 
         let point = self.current_point();
 
-        // TODO: Should this only be set after drawing pixels?
-        let lyc_is_ly = point.y as u8 == self.lyc;
-        self.lcd_status.set_lyc_condition(lyc_is_ly);
-        if lyc_is_ly && self.lcd_status.get_field(LcdStatusBit::LycIntSelect) {
-            todo!("Trigger STAT interrupt");
-        }
-
-        let previous_mode = self.lcd_status.get_ppu_mode();
-
-        let next_mode = match previous_mode {
+        let next_mode = match self.lcd_status.get_ppu_mode() {
             VideoMode::Mode2OamScan => VideoMode::Mode3DrawPixels,
-            VideoMode::Mode3DrawPixels => VideoMode::Mode0HorizontalBlank,
+
+            VideoMode::Mode3DrawPixels => {
+                self.draw_scanline(point.y as u8);
+                VideoMode::Mode0HorizontalBlank
+            },
+
             VideoMode::Mode0HorizontalBlank => {
-                // As we're exiting HBLANK, it means we're at the next line already.
-                self.draw_scanline((point.y - 1) as u8);
+                let lyc_is_ly = point.y as u8 == self.lyc;
+                self.lcd_status.set_lyc_condition(lyc_is_ly);
+
+                if lyc_is_ly && self.lcd_status.get_field(LcdStatusBit::LycIntSelect) {
+                    todo!("Trigger STAT interrupt");
+                }
+
                 if point.y >= (SCREEN_HEIGHT as usize) {
                     VideoMode::Mode1VerticalBlank
                 } else {
                     VideoMode::Mode2OamScan
                 }
-            }
+            },
+
             VideoMode::Mode1VerticalBlank => {
                 self.is_frame_ready = true;
                 VideoMode::Mode2OamScan
