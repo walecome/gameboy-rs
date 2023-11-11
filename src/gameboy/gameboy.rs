@@ -28,6 +28,11 @@ impl Gameboy {
             panic!("Only DMG ROMs support for now");
         }
 
+        match header.sgb_flag {
+            crate::gameboy::header::FlagSGB::NoSGB => (),
+            crate::gameboy::header::FlagSGB::SGB => panic!("SGB features are currently not supported"),
+        }
+
         let cartridge = match create_for_cartridge_type(header.cartridge_type, rom_data) {
             Some(cartridge) => cartridge,
             None => todo!(
