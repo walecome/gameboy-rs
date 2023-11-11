@@ -272,6 +272,10 @@ impl MMU {
 
     pub fn read(&mut self, address: Address) -> u8 {
         self.consume_cycle();
+        self.read_no_consume_cycles(address)
+    }
+
+    fn read_no_consume_cycles(&self, address: Address) -> u8 {
         if address.value() == 0xFF0F {
             return self.interrupt_flags;
         }
@@ -305,6 +309,10 @@ impl MMU {
 
     pub fn write(&mut self, address: Address, value: u8) {
         self.consume_cycle();
+        self.write_no_consume_cycles(address, value);
+    }
+
+    fn write_no_consume_cycles(&mut self, address: Address, value: u8) {
         if address.value() == 0xFF0F {
             self.interrupt_flags = value;
             return;
@@ -410,8 +418,9 @@ impl MMU {
         let mut dst_addr = Address::new(0xFE00);
         for _ in 0..=0x9F {
 
-            let value = self.read(src_addr);
-            self.write(dst_addr, value);
+            // TODO: Check if we need to care about cycles
+            let value = self.read_no_consume_cycles(src_addr);
+            self.write_no_consume_cycles(dst_addr, value);
 
             src_addr = src_addr.next();
             dst_addr = dst_addr.next();
