@@ -15,7 +15,11 @@ impl Address {
     }
 
     pub fn next(&self) -> Self {
-        Self { addr: self.addr + 1 }
+        self.plus(1)
+    }
+
+    pub fn plus(&self, offset: u16) -> Self {
+        Self { addr: self.addr + offset }
     }
 
     pub fn value(&self) -> u16 {

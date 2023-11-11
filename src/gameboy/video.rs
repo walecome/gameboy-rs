@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use crate::common::framebuffer::{FrameBuffer, RgbColor};
 
 use super::address::Address;
@@ -10,6 +12,7 @@ const DOTS_PER_LINE: usize = 456;
 const DOTS_PER_FRAME: usize = 70224;
 const DOTS_OAM_SCAN: usize = 80;
 const MIN_DOTS_DRAW_PIXELS: usize = 172;
+const OAM_START: u16 = 0xFE00;
 
 #[derive(Debug)]
 struct Point {
@@ -166,6 +169,20 @@ fn to_screen_color(palette_color: PaletteColor) -> RgbColor {
         PaletteColor::LightGray => RgbColor::new_gray(160),
         PaletteColor::DarkGray => RgbColor::new_gray(90),
         PaletteColor::Black => RgbColor::new_gray(0),
+    }
+}
+
+struct SpriteObject {
+    y_pos: u8,
+    x_pos: u8,
+    tile_index: u8,
+    attributes: u8,
+    index: u8,
+}
+
+impl SpriteObject {
+    fn is_on_line(&self, line: u8) -> bool {
+        todo!()
     }
 }
 
@@ -389,6 +406,10 @@ impl Video {
                 self.draw_window_for_current_line();
             }
         }
+
+        if self.lcd_control.get_field(LcdControlBit::ObjEnable) {
+            self.draw_sprites_for_current_line(line);
+        }
     }
 
     fn draw_bg_for_current_line(&mut self, line: u8) {
@@ -409,7 +430,42 @@ impl Video {
         }
     }
 
-    fn draw_window_for_current_line(&mut self) {}
+    fn draw_window_for_current_line(&mut self) {
+        todo!("Draw window");
+    }
+
+    fn draw_sprites_for_current_line(&mut self, line: u8) {
+        // https://gbdev.io/pandocs/OAM.html#object-attribute-memory-oam
+
+        // TODO: Should probably take cancelling into account
+        // https://gbdev.io/pandocs/pixel_fifo.html#object-fetch-canceling
+
+        let mut visible_sprites = (0..40).map(|index| {
+            self.read_sprite_object(index)
+        }).filter(|sprite| {
+            sprite.is_on_line(line)
+        }).collect::<Vec<_>>();
+
+        // Sprites with the lowest X position should be drawn first,
+        // if the X position is the same then index is used.
+        visible_sprites.sort_by_key(|sprite| (sprite.x_pos, sprite.index));
+
+        // Because of a limitation of hardware, only ten objects can be displayed per scanline.
+        visible_sprites.truncate(10);
+
+        todo!("Draw sprites");
+    }
+
+    fn read_sprite_object(&self, index: u8) -> SpriteObject {
+        // Sprite objects are 4 bytes
+        let oam_addr = Address::new(OAM_START + (index as u16 * 4));
+        let y_pos = self.read_oam(oam_addr.plus(0));
+        let x_pos = self.read_oam(oam_addr.plus(1));
+        let tile_index = self.read_oam(oam_addr.plus(2));
+        let attributes = self.read_oam(oam_addr.plus(3));
+
+        SpriteObject { y_pos, x_pos, tile_index, attributes, index }
+    }
 
     fn resolve_tile_index(&self, x: u8, y: u8) -> u8 {
         // Background map is 256x256 pixels, i.e. 32x32 tiles (tiles are 8x8 pixel)
