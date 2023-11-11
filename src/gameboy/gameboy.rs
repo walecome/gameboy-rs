@@ -66,7 +66,9 @@ impl Gameboy {
         };
 
         let cycles = self.cpu.tick(current_metadata, self.index);
-        self.cpu.mmu().video().tick(cycles as usize);
+        for _ in 0..cycles {
+            self.cpu.mmu().video().tick();
+        }
         let consumed_memory_cycles = self.cpu.mmu().take_consumed_cycles();
         self.cpu.mmu().maybe_tick_timers(cycles - consumed_memory_cycles);
 

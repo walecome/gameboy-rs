@@ -220,8 +220,8 @@ impl Video {
         return Some(&self.frame_buffer);
     }
 
-    pub fn tick(&mut self, elapsed_cycles: usize) {
-        self.current_dot += elapsed_cycles;
+    pub fn tick(&mut self) {
+        self.current_dot += 1;
 
         let should_do_work = self.is_current_mode_ending();
         let point = self.current_point();
