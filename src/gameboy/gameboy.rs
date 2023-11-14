@@ -4,7 +4,9 @@ use super::cartridge::create_for_cartridge_type;
 use super::cpu::CPU;
 use super::cpu::TraceMode;
 use super::header::{Header, FlagCGB};
+use super::mmu::InterruptSource;
 use super::reference::ReferenceMetadata;
+use super::video::VideoInterrupt;
 
 pub struct Gameboy {
     cpu: CPU,
@@ -67,7 +69,14 @@ impl Gameboy {
 
         let cycles = self.cpu.tick(current_metadata, self.index);
         for _ in 0..cycles {
-            self.cpu.mmu().video().tick();
+            let video_interrupts = self.cpu.mmu().video().tick();
+            for interrupt in video_interrupts {
+                let interrupt_flag = match interrupt {
+                    VideoInterrupt::Stat => InterruptSource::Lcd,
+                    VideoInterrupt::VBlank => InterruptSource::VBlank,
+                };
+                self.cpu.mmu().set_interrupt_flag(interrupt_flag, true);
+            }
         }
         let consumed_memory_cycles = self.cpu.mmu().take_consumed_cycles();
         self.cpu.mmu().maybe_tick_timers(cycles - consumed_memory_cycles);

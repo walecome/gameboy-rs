@@ -22,7 +22,7 @@ impl Cartridge for RomOnly {
     }
 
     fn write(&mut self, _address: Address, _value: u8) {
-        panic!("Attempt to write to RomOnly data");
+        // panic!("Attempt to write to RomOnly data");
     }
 }
 

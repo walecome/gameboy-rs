@@ -1,5 +1,4 @@
-#[derive(Clone, Copy)]
-
+#[derive(Clone, Copy, PartialEq)]
 pub struct RgbColor {
     pub r: u8,
     pub g: u8,

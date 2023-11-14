@@ -1,4 +1,6 @@
-#[derive(Clone, Copy)]
+use core::fmt;
+
+#[derive(Clone, Copy, PartialEq)]
 pub struct Address {
     addr: u16,
 }
@@ -28,5 +30,11 @@ impl Address {
 
     pub fn index_value(&self) -> usize {
         self.addr as usize
+    }
+}
+
+impl fmt::Debug for Address {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Address").field("addr", &format_args!("{:#06X}", &self.addr)).finish()
     }
 }

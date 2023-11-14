@@ -326,7 +326,7 @@ impl MMU {
             0xC000..=0xDFFF => self.internal_ram[address.index_value() - 0xC000] = value,
             0xE000..=0xFDFF => panic!("Write access for prohibited memory area"),
             0xFE00..=0xFE9F => self.video.write_oam(address, value),
-            0xFEA0..=0xFEFF => panic!("Write access for prohibited memory area"),
+            0xFEA0..=0xFEFF => println!("Write access for prohibited memory area: {:#06X}", address.value()),
             0xFF00..=0xFF7F => self.write_io(address, value),
             0xFF80..=0xFFFE => self.high_ram[address.index_value() - 0xFF80] = value,
             0xFFFF => self.interrupt_enable = value,
@@ -365,48 +365,40 @@ impl MMU {
     }
 
     fn read_io(&self, address: Address) -> u8 {
-        let select_byte: u8 = match address.value() {
-            0xFF00..=0xFF70 => (address.value() & 0xFF) as u8,
-            _ => panic!("Trying to read IO outside mapped area: {:#06X}", address.value()),
-        };
-
-        match select_byte {
-            0x00 => self.io.joypad_input,
-            0x01..=0x02 => self.io.serial.read(address),
-            0x04..=0x07 => self.io.timer.read(address),
-            0x10..=0x26 => self.io.audio[(select_byte - 0x10) as usize],
-            0x30..=0x3F => self.io.wave_pattern[(select_byte - 0x30) as usize],
-            0x40..=0x45 => self.video.read_register(select_byte),
-            0x46 => panic!("Reading from DMA transfer register"),
-            0x47..=0x4B => self.video.read_register(select_byte),
-            0x4D => {
+        match address.value() {
+            0xFF00 => self.io.joypad_input,
+            0xFF01..=0xFF02 => self.io.serial.read(address),
+            0xFF04..=0xFF07 => self.io.timer.read(address),
+            0xFF10..=0xFF26 => self.io.audio[address.index_value() - 0xFF10],
+            0xFF30..=0xFF3F => self.io.wave_pattern[address.index_value() - 0xFF30],
+            0xFF40..=0xFF45 => self.video.read_register(address),
+            0xFF46 => panic!("Reading from DMA transfer register"),
+            0xFF47..=0xFF4B => self.video.read_register(address),
+            0xFF4D => {
                 // TODO: This is for CGB, but still used by some roms. Log?
                 0x00
             },
-            0x50 => self.io.boot_rom_disabled,
+            0xFF50 => self.io.boot_rom_disabled,
             _ => panic!("Read for unmapped IO address: {:#06X}", address.value()),
         }
     }
 
     fn write_io(& mut self, address: Address, value: u8) {
-        let select_byte: u8 = match address.value() {
-            0xFF00..=0xFF70 => (address.value() & 0xFF) as u8,
-            _ => panic!("Trying to write IO outside mapped area: {:#06X}", address.value()),
-        };
-
-        match select_byte {
-            0x00 => self.io.joypad_input = value,
-            0x01..=0x02 => self.io.serial.write(address, value),
-            0x04..=0x07 => self.io.timer.write(address, value),
-            0x10..=0x26 => self.io.audio[(select_byte - 0x10) as usize] = value,
-            0x30..=0x3F => self.io.wave_pattern[(select_byte - 0x30) as usize] = value,
-            0x40..=0x45 => self.video.write_register(select_byte, value),
-            0x46 => self.do_dma_transfer(value),
-            0x47..=0x4B => self.video.write_register(select_byte, value),
-            0x4D => {
+        match address.value() {
+            0xFF00 => self.io.joypad_input = value,
+            0xFF01..=0xFF02 => self.io.serial.write(address, value),
+            0xFF04..=0xFF07 => self.io.timer.write(address, value),
+            0xFF10..=0xFF26 => self.io.audio[address.index_value() - 0xFF10] = value,
+            0xFF30..=0xFF3F => self.io.wave_pattern[address.index_value() - 0xFF30] = value,
+            0xFF40..=0xFF45 => self.video.write_register(address, value),
+            0xFF46 => self.do_dma_transfer(value),
+            0xFF47..=0xFF4B => self.video.write_register(address, value),
+            0xFF4D => {
                 // TODO: This is for CGB, but still used by some roms. Log?
             },
-            0x50 => self.io.boot_rom_disabled = value,
+            0xFF50 => self.io.boot_rom_disabled = value,
+            // Undocumented but used
+            0xFF7F => (),
             _ => panic!("Write for unmapped IO address: {:#06X}", address.value()),
         };
     }
