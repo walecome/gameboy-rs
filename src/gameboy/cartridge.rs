@@ -21,8 +21,8 @@ impl Cartridge for RomOnly {
         return self.rom_data[address.index_value()];
     }
 
-    fn write(&mut self, _address: Address, _value: u8) {
-        // panic!("Attempt to write to RomOnly data");
+    fn write(&mut self, address: Address, value: u8) {
+        println!("Attempt to write to RomOnly cartridge: {:?} = {}", address, value);
     }
 }
 

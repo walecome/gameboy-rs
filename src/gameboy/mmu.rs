@@ -398,7 +398,7 @@ impl MMU {
             },
             0xFF50 => self.io.boot_rom_disabled = value,
             // Undocumented but used
-            0xFF7F => (),
+            0xFF7F => println!("Write to undocumented IO address: {:?} = {}", address, value),
             _ => panic!("Write for unmapped IO address: {:#06X}", address.value()),
         };
     }
