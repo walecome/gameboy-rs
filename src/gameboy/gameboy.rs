@@ -69,6 +69,7 @@ impl Gameboy {
 
         let cycles = self.cpu.tick(current_metadata, self.index);
         for _ in 0..cycles {
+            // TODO: Should we tick cycles * 4 here?
             let video_interrupts = self.cpu.mmu().video().tick();
             for interrupt in video_interrupts {
                 let interrupt_flag = match interrupt {
