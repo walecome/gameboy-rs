@@ -50,7 +50,7 @@ impl Word {
 }
 
 pub struct IO {
-    joypad_input: u8,
+    joypad_input: Joypad,
     serial: Serial,
     timer: Timer,
     audio: Vec<u8>,
@@ -69,7 +69,7 @@ fn byte_vec_for_range(
 impl IO {
     fn new(print_serial: bool) -> Self {
         Self {
-            joypad_input: 0x00,
+            joypad_input: Joypad::new(),
             serial: Serial::new(print_serial),
             timer: Timer::new(),
             audio: byte_vec_for_range(0xFF10, 0xFF26),
@@ -246,6 +246,65 @@ impl Serial {
     }
 }
 
+struct Joypad {
+    up: bool,
+    down: bool,
+    left: bool,
+    right: bool,
+    a: bool,
+    b: bool,
+    select: bool,
+    start: bool,
+
+    select_buttons: bool,
+    direction_buttons: bool,
+}
+
+impl Joypad {
+    fn new() -> Self {
+        Self {
+            up: false,
+            down: false,
+            left: false,
+            right: false,
+            a: false,
+            b: false,
+            select: false,
+            start: false,
+            select_buttons: false,
+            direction_buttons: false,
+        }
+    }
+
+    fn read(&self) -> u8 {
+        let mut base: u8 = 0;
+
+        if self.direction_buttons {
+            set_bit_mut(&mut base, 0, !self.right);
+            set_bit_mut(&mut base, 1, !self.left);
+            set_bit_mut(&mut base, 2, !self.up);
+            set_bit_mut(&mut base, 3, !self.down);
+        }
+
+        if self.select_buttons {
+            set_bit_mut(&mut base, 0, !self.a);
+            set_bit_mut(&mut base, 1, !self.b);
+            set_bit_mut(&mut base, 2, !self.select);
+            set_bit_mut(&mut base, 3, !self.start);
+        }
+
+        set_bit_mut(&mut base, 4, !self.direction_buttons);
+        set_bit_mut(&mut base, 5, !self.select_buttons);
+
+        return base;
+    }
+
+    fn write(&mut self, value: u8) {
+        self.direction_buttons = get_bit(value, 4);
+        self.select_buttons = get_bit(value, 5);
+    }
+}
+
 impl MMU {
     pub fn new(cartridge: Box<dyn Cartridge>, print_serial: bool) -> MMU {
         MMU {
@@ -366,7 +425,7 @@ impl MMU {
 
     fn read_io(&self, address: Address) -> u8 {
         match address.value() {
-            0xFF00 => self.io.joypad_input,
+            0xFF00 => self.io.joypad_input.read(),
             0xFF01..=0xFF02 => self.io.serial.read(address),
             0xFF04..=0xFF07 => self.io.timer.read(address),
             0xFF10..=0xFF26 => self.io.audio[address.index_value() - 0xFF10],
@@ -385,7 +444,7 @@ impl MMU {
 
     fn write_io(& mut self, address: Address, value: u8) {
         match address.value() {
-            0xFF00 => self.io.joypad_input = value,
+            0xFF00 => self.io.joypad_input.write(value),
             0xFF01..=0xFF02 => self.io.serial.write(address, value),
             0xFF04..=0xFF07 => self.io.timer.write(address, value),
             0xFF10..=0xFF26 => self.io.audio[address.index_value() - 0xFF10] = value,
