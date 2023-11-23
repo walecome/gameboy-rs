@@ -1,22 +1,26 @@
 use std::path::PathBuf;
 use std::fs;
 
+#[derive(Debug)]
 pub enum ReferenceOpcode {
     Plain(u8),
     CB(u8),
 }
 
+#[derive(Debug)]
 pub struct ReferenceMetadata {
     pub pc: u16,
     pub instruction: String,
     pub opcode: ReferenceOpcode,
+    pub line: usize,
 }
 
 pub fn get_reference_metadata(reference: &PathBuf) -> Vec<ReferenceMetadata> {
     fs::read_to_string(reference)
         .unwrap()
         .lines()
-        .filter_map(|line| {
+        .enumerate()
+        .filter_map(|(index, line)| {
             let parts: Vec<&str> = line.split(": ").collect();
             let raw_addr = parts[0]
                     .strip_prefix("0x")?;
@@ -29,6 +33,7 @@ pub fn get_reference_metadata(reference: &PathBuf) -> Vec<ReferenceMetadata> {
                 pc,
                 instruction,
                 opcode: read_opcode(line),
+                line: index + 1,
             })
         })
         .collect()

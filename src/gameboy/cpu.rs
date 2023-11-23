@@ -199,8 +199,8 @@ fn verify_state(
 
     let maybe_error_message = if pc != metadata.pc {
         Some(format!(
-            "PC({:#06X}) != reference PC ({:#06X}). Metadata: {}",
-            pc, metadata.pc, metadata.instruction
+            "PC({:#06X}) != reference PC ({:#06X}). Metadata: {:#?}",
+            pc, metadata.pc, metadata,
         ))
     } else { None };
 
