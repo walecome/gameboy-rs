@@ -614,7 +614,7 @@ impl CPU {
 
     fn stack_pop(&mut self) -> u16 {
         let word = self.mmu.read_word(Address::new(self.sp));
-        self.sp += 2;
+        self.sp = self.sp.wrapping_add(2);
         word.value
     }
 
