@@ -112,7 +112,7 @@ pub fn interrupt_vector(interrupt: InterruptSource) -> u8 {
 }
 
 struct Timer {
-    divider: u8,
+    divider: u16,
     timer_counter: u8,
     timer_modulo: u8,
     timer_control: u8,
@@ -142,7 +142,9 @@ impl Timer {
 
     fn read(&self, address: Address) -> u8 {
         match address.value() {
-            0xFF04 => self.divider,
+            // The divider ticks at CPU clock / 256, so use
+            // the lower 8 bits (256) of the 16 bits to cover that.
+            0xFF04 => (self.divider >> 8) as u8,
             0xFF05 => self.timer_counter,
             0xFF06 => self.timer_modulo,
             0xFF07 => self.timer_control,
@@ -167,6 +169,7 @@ impl Timer {
     fn maybe_tick_cycles(&mut self, elapsed_cycles: u8) -> bool {
         let mut fire_interrupt = false;
         for _ in 0..(elapsed_cycles * 4) {
+            self.divider = self.divider.wrapping_add(1);
             if self.is_timer_enabled() {
                 fire_interrupt |= self.tick_clock();
             }
