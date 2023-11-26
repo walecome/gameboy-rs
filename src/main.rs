@@ -60,10 +60,11 @@ fn main() -> Result<(), String> {
         let maybe_frame = gameboy.tick();
 
         if let (Some(frame), Some(platform)) = (maybe_frame, maybe_platform.as_mut()) {
-            let maybe_event = platform.give_new_frame(frame);
-            if let Some(event) = maybe_event {
+            let events = platform.give_new_frame(frame);
+            for event in events {
                 match event {
                     PlatformEvent::Quit => break 'running,
+                    PlatformEvent::Joypad(event) => gameboy.take_joypad_event(event),
                 }
             }
         }

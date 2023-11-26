@@ -1,4 +1,5 @@
 use crate::common::framebuffer::FrameBuffer;
+use crate::common::joypad_events::JoypadEvent;
 
 use super::cartridge::create_for_cartridge_type;
 use super::cpu::CPU;
@@ -85,5 +86,9 @@ impl Gameboy {
         self.index += 1;
 
         return self.cpu.mmu().video().try_take_frame();
+    }
+
+    pub fn take_joypad_event(&mut self, event: JoypadEvent) {
+        self.cpu.mmu().joypad().consume_platform_event(event);
     }
 }

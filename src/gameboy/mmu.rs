@@ -1,5 +1,7 @@
 use std::io::{self, Write};
 
+use crate::common::joypad_events::{JoypadEvent, JoypadButton};
+
 use super::address::Address;
 use super::cartridge::Cartridge;
 use super::video::Video;
@@ -246,7 +248,8 @@ impl Serial {
     }
 }
 
-struct Joypad {
+#[derive(Debug)]
+pub struct Joypad {
     up: bool,
     down: bool,
     left: bool,
@@ -276,8 +279,22 @@ impl Joypad {
         }
     }
 
+    pub fn consume_platform_event(&mut self, event: JoypadEvent) {
+        let field: &mut bool = match event.button {
+            JoypadButton::Up => &mut self.up,
+            JoypadButton::Down => &mut self.down,
+            JoypadButton::Left => &mut self.left,
+            JoypadButton::Right => &mut self.right,
+            JoypadButton::A => &mut self.a,
+            JoypadButton::B => &mut self.b,
+            JoypadButton::Select => &mut self.select,
+            JoypadButton::Start => &mut self.start,
+        };
+        *field = event.is_down;
+    }
+
     fn read(&self) -> u8 {
-        let mut base: u8 = 0;
+        let mut base: u8 = 0xF;
 
         if self.direction_buttons {
             set_bit_mut(&mut base, 0, !self.right);
@@ -300,8 +317,8 @@ impl Joypad {
     }
 
     fn write(&mut self, value: u8) {
-        self.direction_buttons = get_bit(value, 4);
-        self.select_buttons = get_bit(value, 5);
+        self.direction_buttons = !get_bit(value, 4);
+        self.select_buttons = !get_bit(value, 5);
     }
 }
 
@@ -327,6 +344,10 @@ impl MMU {
 
     pub fn video(&mut self) -> &mut Video {
         &mut self.video
+    }
+
+    pub fn joypad(&mut self) -> &mut Joypad {
+        &mut self.io.joypad_input
     }
 
     pub fn read(&mut self, address: Address) -> u8 {
