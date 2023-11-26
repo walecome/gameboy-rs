@@ -529,7 +529,7 @@ impl Video {
 
             // From pandocs:
             // X = Object’s horizontal position on the screen + 8.
-            let x_start = sprite.x_pos.wrapping_sub(7);
+            let x_start = sprite.x_pos.wrapping_sub(8);
 
             for current_pixel in 0..8 {
                 let x_on_screen = x_start + current_pixel;
