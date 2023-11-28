@@ -532,7 +532,7 @@ impl Video {
             let x_start = sprite.x_pos.wrapping_sub(8);
 
             for current_pixel in 0..8 {
-                let x_on_screen = x_start + current_pixel;
+                let x_on_screen = x_start.wrapping_add(current_pixel);
 
                 if x_on_screen >= SCREEN_WIDTH {
                     continue;
