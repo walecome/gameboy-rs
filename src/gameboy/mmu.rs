@@ -372,7 +372,7 @@ impl MMU {
                 }
             }
             0x8000..=0x9FFF => self.video.read_vram(address),
-            0xA000..=0xBFFF => todo!("Read from cartridge RAM"),
+            0xA000..=0xBFFF => self.cartridge.read(address),
             0xC000..=0xDFFF => self.internal_ram[address.index_value() - 0xC000],
             0xE000..=0xFDFF => panic!("Read access for prohibited memory area"),
             0xFE00..=0xFE9F => self.video.read_oam(address),
@@ -402,10 +402,9 @@ impl MMU {
         }
 
         match address.value() {
-            0x0000..=0x3FFF => self.cartridge.write(address, value),
-            0x4000..=0x7FFF => todo!("Write to cartridge (switchable bank)"),
+            0x0000..=0x7FFF => self.cartridge.write(address, value),
             0x8000..=0x9FFF => self.video.write_vram(address, value),
-            0xA000..=0xBFFF => todo!("Write to cartridge RAM"),
+            0xA000..=0xBFFF => self.cartridge.write(address, value),
             0xC000..=0xDFFF => self.internal_ram[address.index_value() - 0xC000] = value,
             0xE000..=0xFDFF => panic!("Write access for prohibited memory area"),
             0xFE00..=0xFE9F => self.video.write_oam(address, value),
