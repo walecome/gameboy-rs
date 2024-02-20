@@ -495,7 +495,7 @@ impl Video {
     }
 
     fn draw_window_for_current_line(&mut self) {
-        todo!("Draw window");
+        println!("TODO: Draw window!");
     }
 
     fn draw_sprites_for_current_line(&mut self, line: u8) {
