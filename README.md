@@ -38,10 +38,10 @@ Some simple ROM tests are included as well. This runs the compatible Blargg test
 - [x] Blargg memory timing tests
 - [x] PPU background rendering
 - [ ] PPU window rendering
-- [ ] PPU sprite rendering
+- [x] PPU sprite rendering
 - [x] MBC1 cartridge support
 - [ ] Support for other cartridge types
-- [ ] Joypad input
+- [x] Joypad input
 - [ ] Sound
 - [ ] Gameboy color compatibility
 - [ ] Debugger?
