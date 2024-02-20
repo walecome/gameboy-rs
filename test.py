@@ -6,6 +6,7 @@ import time
 import fcntl
 import os
 
+from argparse import ArgumentParser
 from pathlib import Path
 from typing import IO, List, Optional
 from enum import Enum, auto
@@ -13,9 +14,12 @@ from dataclasses import dataclass
 
 SCRIPT_DIR = Path(__file__).parent
 
-def build_emulator():
+def build_emulator(release: bool):
+    cmd = ['cargo', 'build']
+    if release:
+        cmd.append('--release')
     ret = subprocess.run(
-        ['cargo', 'build'],
+        cmd,
         capture_output=True,
         cwd=SCRIPT_DIR,
     )
@@ -70,13 +74,16 @@ def try_extract_result(output: StreamedOutput) -> Optional[TestStatus]:
 def run_test(
         rom: Path,
         timeout: int,
+        release: bool,
 ) -> TestResult:
     print(f"TEST: {rom.relative_to(SCRIPT_DIR)}")
     start_time = time.time()
 
+    target = "release" if release else "debug"
+
     with subprocess.Popen(
         [
-            'target/debug/gameboy-rs',
+            f"target/{target}/gameboy-rs",
             '--rom', rom,
             '--headless',
             '--trace-mode', 'serial',
@@ -147,17 +154,27 @@ def emit_result(result: TestResult) -> bool:
 
     return False
 
+def parse_args():
+    parser = ArgumentParser()
+    parser.add_argument(
+        '--release',
+        action='store_true',
+        help='Run tests in release mode',
+    )
+    return parser.parse_args()
+
 def main():
     test_rom_base_dir = SCRIPT_DIR / 'lib' / 'gb-test-roms'
     test_roms = get_test_roms(test_rom_base_dir)
     if not test_roms:
         print(f"No test roms found in dir: {test_rom_base_dir}")
         sys.exit(1)
-    build_emulator()
+    args = parse_args()
+    build_emulator(release=args.release)
 
     all_passed = True
     for test_rom in test_roms:
-        result = run_test(test_rom, timeout=50)
+        result = run_test(test_rom, timeout=50, release=args.release)
         all_passed &= emit_result(result)
 
     if all_passed:
